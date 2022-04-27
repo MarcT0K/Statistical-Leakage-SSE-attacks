@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import csv
-from nis import match
+import pickle
 
 import numpy as np
 import tqdm
@@ -9,11 +9,10 @@ import matplotlib.pyplot as plt
 
 from src.common import KeywordExtractor, generate_known_queries
 from src.email_extraction import (
-    extract_sent_mail_contents,
     extract_apache_ml,
-    extract_blogs,
 )
 from src.attacks.score import RefinedScoreAttacker
+from src.attacks.sap import SAPAttacker
 
 epsilon_sim = lambda coocc_1, coocc_2: np.linalg.norm(coocc_1 - coocc_2)
 
@@ -139,8 +138,10 @@ def fig_subsec_4C(show=True):
 
 
 def enron_metric_sensivity():
-    enron_emails = extract_sent_mail_contents()
-    extractor = KeywordExtractor(enron_emails, VOC_SIZE, 1)
+    # enron_emails = extract_sent_mail_contents()
+    # extractor = KeywordExtractor(enron_emails, VOC_SIZE, 1)
+    with open("enron_extractor.pkl", "rb") as f:
+        extractor = pickle.load(f)
     occ_mat = extractor.occ_array
     n_tot = extractor.occ_array.shape[0]
 
@@ -156,69 +157,158 @@ def enron_metric_sensivity():
         ]
         writer = csv.DictWriter(csvfile, delimiter=";", fieldnames=fieldnames)
         writer.writeheader()
-        for i in tqdm.tqdm(iterable=range(1, 10)):
-            for j in range(1, 10):
-                for _rep in range(5):
-                    choice_serv = np.random.choice(
-                        range(n_tot), size=(int(n_tot * i * 0.05),), replace=False
-                    )
-                    ind_serv = np.zeros(n_tot, dtype=bool)
-                    ind_serv[choice_serv] = True
-                    serv_mat = occ_mat[ind_serv, :]
-                    full_atk_mat = occ_mat[~ind_serv, :]
-                    atk_max_docs = full_atk_mat.shape[0]
+        for i, j in tqdm.tqdm(
+            iterable=[
+                (i, j) for i in range(1, 10) for j in range(1, 10) for k in range(5)
+            ],
+            desc="Running the experiments",
+        ):
+            choice_serv = np.random.choice(
+                range(n_tot), size=(int(n_tot * i * 0.05),), replace=False
+            )
+            ind_serv = np.zeros(n_tot, dtype=bool)
+            ind_serv[choice_serv] = True
+            serv_mat = occ_mat[ind_serv, :]
+            full_atk_mat = occ_mat[~ind_serv, :]
+            atk_max_docs = full_atk_mat.shape[0]
 
-                    sub_choice = np.random.choice(
-                        range(atk_max_docs),
-                        size=(int(atk_max_docs * (j + 1) * 0.05),),
-                        replace=False,
-                    )
+            sub_choice = np.random.choice(
+                range(atk_max_docs),
+                size=(int(atk_max_docs * (j + 1) * 0.05),),
+                replace=False,
+            )
 
-                    voc = list(extractor.get_sorted_voc())
-                    queries_ind = np.random.choice(
-                        len(voc), QUERYSET_SIZE, replace=False
-                    )
-                    queries = [voc[ind] for ind in queries_ind]
-                    known_queries = generate_known_queries(
-                        similar_wordlist=voc,
-                        stored_wordlist=queries,
-                        nb_queries=KNOWN_QUERIES,
-                    )
+            voc = list(extractor.get_sorted_voc())
+            queries_ind = np.random.choice(len(voc), QUERYSET_SIZE, replace=False)
+            queries = [voc[ind] for ind in queries_ind]
+            known_queries = generate_known_queries(
+                similar_wordlist=voc,
+                stored_wordlist=queries,
+                nb_queries=KNOWN_QUERIES,
+            )
 
-                    matchmaker = RefinedScoreAttacker(
-                        keyword_occ_array=full_atk_mat[sub_choice, :],
-                        keyword_sorted_voc=voc,
-                        trapdoor_occ_array=serv_mat[:, queries_ind],
-                        trapdoor_sorted_voc=queries,
-                        nb_stored_docs=serv_mat.shape[0],
-                        known_queries=known_queries,
-                        ref_speed=10
-                    )
+            ref_atk = RefinedScoreAttacker(
+                keyword_occ_array=full_atk_mat[sub_choice, :],
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=serv_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=serv_mat.shape[0],
+                known_queries=known_queries,
+                ref_speed=10,
+            )
 
-                    unknown_queries = list(
-                        set(queries).difference(list(known_queries.keys()))
-                    )
-                    res_ref = matchmaker.predict(
-                        unknown_queries
-                    )
-                    ref_acc = np.mean(
-                        [word == candidate for word, candidate in res_ref.items()]
-                    )
+            ref_pred = ref_atk.predict()
+            ref_acc = np.mean(
+                [word == candidate for word, candidate in ref_pred.items()]
+            )
 
-                    atk_full_coocc = (
-                        full_atk_mat[sub_choice, :].T
-                        @ full_atk_mat[sub_choice, :]
-                        / full_atk_mat[sub_choice, :].shape[0]
-                    )
+            ind_doc_coocc = serv_mat.T @ serv_mat / serv_mat.shape[0]
+            atk_full_coocc = (
+                full_atk_mat[sub_choice, :].T
+                @ full_atk_mat[sub_choice, :]
+                / full_atk_mat[sub_choice, :].shape[0]
+            )
 
-                    writer.writerow(
-                        {
-                            "Nb similar docs": len(sub_choice),
-                            "Nb server docs": ind_serv.sum(),
-                            "Voc size": len(voc),
-                            "Nb queries": len(queries),
-                            "Nb queries known": len(known_queries),
-                            "Epsilon": epsilon_sim(matchmaker.kw_coocc, atk_full_coocc),
-                            "Refined Score Acc": ref_acc,
-                        }
-                    )
+            writer.writerow(
+                {
+                    "Nb similar docs": len(sub_choice),
+                    "Nb server docs": ind_serv.sum(),
+                    "Voc size": len(voc),
+                    "Nb queries": len(queries),
+                    "Nb queries known": len(known_queries),
+                    "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
+                    "Refined Score Acc": ref_acc,
+                }
+            )
+
+
+def test_known_data_atk():
+    # enron_emails = extract_sent_mail_contents()
+    # extractor = KeywordExtractor(enron_emails, VOC_SIZE, 1)
+    with open("enron_extractor.pkl", "rb") as f:
+        extractor = pickle.load(f)
+    occ_mat = extractor.occ_array
+
+    with open("test_sap.csv", "w", newline="") as csvfile:
+        fieldnames = [
+            "Nb similar docs",
+            "Nb server docs",
+            "Voc size",
+            "Nb queries",
+            "Nb queries known",
+            "Epsilon",
+            "Refined Score Acc",
+            "SAP Acc",
+        ]
+        writer = csv.DictWriter(csvfile, delimiter=";", fieldnames=fieldnames)
+        writer.writeheader()
+        for j in tqdm.tqdm(
+            iterable=[j for j in range(10, 11) for k in range(5)],
+            desc="Running the experiments",
+        ):
+            serv_mat = occ_mat
+            full_atk_mat = occ_mat
+            atk_max_docs = full_atk_mat.shape[0]
+
+            sub_choice = np.random.choice(
+                range(atk_max_docs),
+                size=(int(atk_max_docs * j * 0.1),),
+                replace=False,
+            )
+
+            voc = list(extractor.get_sorted_voc())
+            queries_ind = np.random.choice(len(voc), QUERYSET_SIZE, replace=False)
+            queries = [voc[ind] for ind in queries_ind]
+            known_queries = generate_known_queries(
+                similar_wordlist=voc,
+                stored_wordlist=queries,
+                nb_queries=KNOWN_QUERIES,
+            )
+
+            # ref_atk = RefinedScoreAttacker(
+            #     keyword_occ_array=full_atk_mat[sub_choice, :],
+            #     keyword_sorted_voc=voc,
+            #     trapdoor_occ_array=serv_mat[:, queries_ind],
+            #     trapdoor_sorted_voc=queries,
+            #     nb_stored_docs=serv_mat.shape[0],
+            #     known_queries=known_queries,
+            #     ref_speed=10,
+            # )
+
+            # ref_pred = ref_atk.predict()
+            # ref_acc = np.mean(
+            #     [word == candidate for word, candidate in ref_pred.items()]
+            # )
+
+            sap_atk = SAPAttacker(
+                keyword_occ_array=full_atk_mat[sub_choice, :],
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=serv_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=serv_mat.shape[0],
+            )
+
+            sap_pred = sap_atk.predict()
+            sap_acc = np.mean(
+                [word == candidate for word, candidate in sap_pred.items()]
+            )
+
+            ind_doc_coocc = serv_mat.T @ serv_mat / serv_mat.shape[0]
+            atk_full_coocc = (
+                full_atk_mat[sub_choice, :].T
+                @ full_atk_mat[sub_choice, :]
+                / full_atk_mat[sub_choice, :].shape[0]
+            )
+
+            writer.writerow(
+                {
+                    "Nb similar docs": len(sub_choice),
+                    "Nb server docs": occ_mat.shape[0],
+                    "Voc size": len(voc),
+                    "Nb queries": len(queries),
+                    "Nb queries known": len(known_queries),
+                    "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
+                    "Refined Score Acc": 0,
+                    "SAP Acc": sap_acc,
+                }
+            )

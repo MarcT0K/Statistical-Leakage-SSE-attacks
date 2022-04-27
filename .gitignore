@@ -130,3 +130,6 @@ dmypy.json
 
 # Other stuff
 *.csv
+.vscode
+graphm**
+*.pkl

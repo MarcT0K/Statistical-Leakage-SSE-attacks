@@ -1,17 +1,15 @@
 import multiprocessing
 
-from functools import partial, reduce
-from typing import Dict, List, Optional, Tuple
+from functools import reduce
+from typing import Dict, List, Tuple
 
 import colorlog
 import numpy as np
-import tqdm
 
-from .keyword_attacker import KeywordAttacker
+from .utils import KeywordAttacker
 from ..common import poolcontext
 
 logger = colorlog.getLogger("RaaC paper")
-
 
 
 class AbstractScoreAttacker(KeywordAttacker):
@@ -50,7 +48,11 @@ class AbstractScoreAttacker(KeywordAttacker):
             raise ValueError("Several trapdoors are linked to the same keyword.")
 
         self._known_queries = known_queries.copy()  # Keys: trapdoor, Values: keyword
+        self.unknown_trapdoors = list(
+            set(list(self.td_voc_info.keys())).difference(list(known_queries.keys()))
+        )
 
+        self._compute_coocc_matrices(keyword_occ_array, trapdoor_occ_array)
         self._refresh_reduced_coocc()
 
     def _refresh_reduced_coocc(self):
@@ -65,7 +67,7 @@ class AbstractScoreAttacker(KeywordAttacker):
         self.td_reduced_coocc = self.td_coocc[:, ind_known_td]
 
     def _sub_pred(
-        self, _ind: int, td_list: List[str], cluster_max_size=1
+        self, _ind: int, td_list: List[str]
     ) -> List[Tuple[str, List[str], float]]:
         """
         Sub-function used to parallelize the prediction.
@@ -74,8 +76,6 @@ class AbstractScoreAttacker(KeywordAttacker):
             List[Tuple[str,List[str], float]] -- a list of tuples (trapdoor, [prediction], certainty) or
                                                     (trapdoor, cluster of predictions, certainty)
         """
-        if cluster_max_size < 1:
-            raise ValueError("The cluster size must be one or more.")
 
         prediction = []
         for trapdoor in td_list:
@@ -83,9 +83,7 @@ class AbstractScoreAttacker(KeywordAttacker):
                 trapdoor_ind = self.td_voc_info[trapdoor]["vector_ind"]
             except KeyError:
                 logger.warning(f"Unknown trapdoor: {trapdoor}")
-                prediction.append(
-                    ((trapdoor, [], 0) if cluster_max_size > 1 else (trapdoor, [""], 0))
-                )
+                prediction.append((trapdoor, "", 0))
                 continue
             trapdoor_vec = self.td_reduced_coocc[trapdoor_ind]
 
@@ -103,47 +101,22 @@ class AbstractScoreAttacker(KeywordAttacker):
                 score_list.append((keyword, score))
             score_list.sort(key=lambda tup: tup[1])
 
-            if cluster_max_size > 1:  # Cluster mode
-                kw_cluster, certainty = self.best_candidate_clustering(
-                    score_list,
-                    cluster_max_size=cluster_max_size,
-                )
-                prediction.append((trapdoor, kw_cluster, certainty))
-            else:  # No clustering
-                best_candidate = score_list[-1][0]
-                certainty = score_list[-1][1] - score_list[-2][1]
-                prediction.append((trapdoor, [best_candidate], certainty))
+            best_candidate = score_list[-1][0]
+            certainty = score_list[-1][1] - score_list[-2][1]
+            prediction.append((trapdoor, best_candidate, certainty))
         return prediction
 
 
 class ScoreAttacker(AbstractScoreAttacker):
-    def __init__(
-        self,
-        keyword_occ_array,
-        trapdoor_occ_array,
-        keyword_sorted_voc,
-        trapdoor_sorted_voc,
-        nb_stored_docs,
-        known_queries,
-    ):
-        super().__init__(
-            keyword_occ_array,
-            trapdoor_occ_array,
-            keyword_sorted_voc,
-            trapdoor_sorted_voc,
-            nb_stored_docs,
-            known_queries,
-        )
-
-    def predict(self, trapdoor_list: List[str]) -> Dict[str, List[str]]:
+    def predict(self) -> Dict[str, List[str]]:
         predictions = {}
         nb_cores = multiprocessing.cpu_count()
-        logger.info("Evaluating every possible keyword-trapdoor pair")
         with poolcontext(processes=nb_cores) as pool:
-            pred_func = partial(self._sub_pred)
             results = pool.starmap(
-                pred_func,
-                enumerate([trapdoor_list[i::nb_cores] for i in range(nb_cores)]),
+                self._sub_pred,
+                enumerate(
+                    [self.unknown_trapdoors[i::nb_cores] for i in range(nb_cores)]
+                ),
             )
             pred_list = reduce(lambda x, y: x + y, results)
             predictions = {td: kw for td, kw, _certainty in pred_list}
@@ -176,55 +149,44 @@ class RefinedScoreAttacker(AbstractScoreAttacker):
         else:
             self.ref_speed = ref_speed
 
-    def predict(self, trapdoor_list: List[str]) -> Dict[str, List[str]]:
-
+    def predict(self) -> Dict[str, List[str]]:
+        unknown_td_list = self.unknown_trapdoors
         old_known = self._known_queries.copy()
         nb_cores = multiprocessing.cpu_count()
-        unknown_td_list = list(trapdoor_list)
 
         final_results = []
-        with poolcontext(processes=nb_cores) as pool, tqdm.tqdm(
-            total=len(trapdoor_list), desc="Refining predictions"
-        ) as pbar:
+        with poolcontext(processes=nb_cores) as pool:
             while True:
-                prev_td_nb = len(unknown_td_list)
                 unknown_td_list = [
                     td for td in unknown_td_list if td not in self._known_queries.keys()
                 ]  # Removes the known trapdoors
-                pbar.update(prev_td_nb - len(unknown_td_list))
-                pred_func = partial(
-                    self._sub_pred,
-                    cluster_max_size=1,
-                )
                 results = pool.starmap(  # Launch parallel predictions
-                    pred_func,
+                    self._sub_pred,
                     enumerate([unknown_td_list[i::nb_cores] for i in range(nb_cores)]),
                 )
                 results = reduce(lambda x, y: x + y, results)
 
-                # Extract the best preditions (must be single-point clusters)
-                single_point_results = [tup for tup in results if len(tup[1]) == 1]
-                single_point_results.sort(key=lambda tup: tup[2])
+                # Extract the best preditions
+                results.sort(key=lambda tup: tup[2])
 
                 if (
-                    len(single_point_results) < self.ref_speed
-                ):  # Not enough single-point predictions
-                    final_results = [
-                        (td, candidates) for td, candidates, _sep in results
-                    ]
+                    len(results) < self.ref_speed
+                ):  # Predicted all the trapdoors. Can stop the refinement
+                    final_results = [(td, candidate) for td, candidate, _sep in results]
                     break
 
                 # Add the pseudo-known queries.
                 new_known = {
-                    td: candidates[-1]
-                    for td, candidates, _sep in single_point_results[-self.ref_speed :]
+                    td: candidate for td, candidate, _sep in results[-self.ref_speed :]
                 }
                 self._known_queries.update(new_known)
                 self._refresh_reduced_coocc()
 
         # Concatenate known queries and last results
         prediction = {
-            td: [kw] for td, kw in self._known_queries.items() if td in trapdoor_list
+            td: kw
+            for td, kw in self._known_queries.items()
+            if td in self.unknown_trapdoors
         }
         prediction.update(dict(final_results))
 
