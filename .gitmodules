@@ -1,0 +1,3 @@
+[submodule "graphm-fixed"]
+	path = graphm-fixed
+	url = https://github.com/MarcT0K/graphm-fixed.git

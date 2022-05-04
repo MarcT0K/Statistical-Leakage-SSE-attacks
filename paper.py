@@ -8,14 +8,11 @@ import tqdm
 import matplotlib.pyplot as plt
 
 from src.common import KeywordExtractor, generate_known_queries
-from src.email_extraction import (
-    extract_apache_ml,
-)
+from src.email_extraction import extract_apache_ml, extract_sent_mail_contents
 from src.attacks.score import RefinedScoreAttacker
-from src.attacks.sap import SAPAttacker
+from src.attacks.graphm import GraphMatchingAttacker
 
 epsilon_sim = lambda coocc_1, coocc_2: np.linalg.norm(coocc_1 - coocc_2)
-
 
 params = {
     "text.usetex": True,
@@ -48,7 +45,7 @@ def res_subsec_4C():
     kw_mat = occ_mat[~ind_serv, :]
     kw_max_docs = kw_mat.shape[0]
 
-    with open("fig_subsec_4C.csv", "w", newline="") as csvfile:
+    with open("fig_subsec_4C.csv", "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = [
             "Nb similar docs",
             "Nb server docs",
@@ -89,7 +86,7 @@ def res_subsec_4C():
 
 
 def fig_subsec_4C(show=True):
-    with open("fig_subsec_4C.csv", "r") as csvfile:
+    with open("fig_subsec_4C.csv", "r", encoding="utf-8") as csvfile:
         csvfile.readline()
         arr = np.loadtxt(csvfile, delimiter=",")
         x = np.sqrt(1 / arr[:, 0] + 1 / arr[:, 1])
@@ -145,7 +142,7 @@ def enron_metric_sensivity():
     occ_mat = extractor.occ_array
     n_tot = extractor.occ_array.shape[0]
 
-    with open("enron_sim_acc.csv", "w", newline="") as csvfile:
+    with open("enron_sim_acc.csv", "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = [
             "Nb similar docs",
             "Nb server docs",
@@ -223,13 +220,13 @@ def enron_metric_sensivity():
 
 
 def test_known_data_atk():
-    # enron_emails = extract_sent_mail_contents()
-    # extractor = KeywordExtractor(enron_emails, VOC_SIZE, 1)
-    with open("enron_extractor.pkl", "rb") as f:
-        extractor = pickle.load(f)
+    enron_emails = extract_sent_mail_contents()
+    extractor = KeywordExtractor(enron_emails, 100, 1)
+    # with open("enron_extractor.pkl", "rb") as f:
+    #     extractor = pickle.load(f)
     occ_mat = extractor.occ_array
 
-    with open("test_sap.csv", "w", newline="") as csvfile:
+    with open("test_graphm.csv", "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = [
             "Nb similar docs",
             "Nb server docs",
@@ -238,7 +235,7 @@ def test_known_data_atk():
             "Nb queries known",
             "Epsilon",
             "Refined Score Acc",
-            "SAP Acc",
+            "Graphm Acc",
         ]
         writer = csv.DictWriter(csvfile, delimiter=";", fieldnames=fieldnames)
         writer.writeheader()
@@ -257,7 +254,7 @@ def test_known_data_atk():
             )
 
             voc = list(extractor.get_sorted_voc())
-            queries_ind = np.random.choice(len(voc), QUERYSET_SIZE, replace=False)
+            queries_ind = np.random.choice(len(voc), 70, replace=False)
             queries = [voc[ind] for ind in queries_ind]
             known_queries = generate_known_queries(
                 similar_wordlist=voc,
@@ -265,22 +262,22 @@ def test_known_data_atk():
                 nb_queries=KNOWN_QUERIES,
             )
 
-            # ref_atk = RefinedScoreAttacker(
-            #     keyword_occ_array=full_atk_mat[sub_choice, :],
-            #     keyword_sorted_voc=voc,
-            #     trapdoor_occ_array=serv_mat[:, queries_ind],
-            #     trapdoor_sorted_voc=queries,
-            #     nb_stored_docs=serv_mat.shape[0],
-            #     known_queries=known_queries,
-            #     ref_speed=10,
-            # )
+            ref_atk = RefinedScoreAttacker(
+                keyword_occ_array=full_atk_mat[sub_choice, :],
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=serv_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=serv_mat.shape[0],
+                known_queries=known_queries,
+                ref_speed=10,
+            )
 
-            # ref_pred = ref_atk.predict()
-            # ref_acc = np.mean(
-            #     [word == candidate for word, candidate in ref_pred.items()]
-            # )
+            ref_pred = ref_atk.predict()
+            ref_acc = np.mean(
+                [word == candidate for word, candidate in ref_pred.items()]
+            )
 
-            sap_atk = SAPAttacker(
+            graphm_atk = GraphMatchingAttacker(
                 keyword_occ_array=full_atk_mat[sub_choice, :],
                 keyword_sorted_voc=voc,
                 trapdoor_occ_array=serv_mat[:, queries_ind],
@@ -288,9 +285,9 @@ def test_known_data_atk():
                 nb_stored_docs=serv_mat.shape[0],
             )
 
-            sap_pred = sap_atk.predict()
-            sap_acc = np.mean(
-                [word == candidate for word, candidate in sap_pred.items()]
+            graphm_pred = graphm_atk.predict()
+            graphm_acc = np.mean(
+                [word == candidate for word, candidate in graphm_pred.items()]
             )
 
             ind_doc_coocc = serv_mat.T @ serv_mat / serv_mat.shape[0]
@@ -308,7 +305,7 @@ def test_known_data_atk():
                     "Nb queries": len(queries),
                     "Nb queries known": len(known_queries),
                     "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
-                    "Refined Score Acc": 0,
-                    "SAP Acc": sap_acc,
+                    "Refined Score Acc": ref_acc,
+                    "Graphm Acc": graphm_acc,
                 }
             )

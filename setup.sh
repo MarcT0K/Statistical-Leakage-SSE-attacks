@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Install GraphM
+cd graphm-fixed
+./graphm_install
+cd ..
+
 pip3 install -r requirements.txt
 
 # Enron Dataset
@@ -20,4 +25,3 @@ done
 # Blogs
 # TODO
 
-# Install Graph Matching binary

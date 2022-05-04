@@ -1,6 +1,7 @@
 import os
 import subprocess
 import stat
+import shutil
 
 from typing import List
 from .utils import KeywordAttacker, compute_log_binomial_probability_matrix
@@ -26,7 +27,7 @@ class GraphMatchingAttacker(KeywordAttacker):
         self._compute_coocc_matrices(keyword_occ_array, trapdoor_occ_array)
         self.sorted_keywords = keyword_sorted_voc
         self.sorted_trapdoors = trapdoor_sorted_voc
-        self.alpha = 0
+        self.alpha = 0.5
 
         kw_probs_train = list(
             [
@@ -50,87 +51,71 @@ class GraphMatchingAttacker(KeywordAttacker):
         self.alpha = new_alpha
 
     def predict(self):
+        folder_path = "./tmp_results"
 
-        query_predictions_for_each_tag = self._run_graphm_attack_given_matrices(
-            "./results",
-            self.sorted_trapdoors,
-            self.kw_coocc,
-            self.td_coocc,
-            self.cost_vol,
-            self.alpha,
-        )
-
-        return query_predictions_for_each_tag
-
-    def _run_graphm_attack_given_matrices(
-        self,
-        folder_path,
-        tag_list,
-        m_matrix,
-        m_prime_matrix,
-        c_matrix,
-        alpha,
-        clean_after_attack=True,
-    ):
         os.makedirs(folder_path)  # We create and destroy the subdir in this function
 
-        with open(os.path.join(folder_path, "graph_1"), "wb") as file_ptr:
-            write_matrix_to_file_ascii(file_ptr, m_matrix)
+        try:
+            with open(os.path.join(folder_path, "graph_1"), "wb") as file_ptr:
+                write_matrix_to_file_ascii(file_ptr, self.kw_coocc)
 
-        with open(os.path.join(folder_path, "graph_2"), "wb") as file_ptr:
-            write_matrix_to_file_ascii(file_ptr, m_prime_matrix)
+            with open(os.path.join(folder_path, "graph_2"), "wb") as file_ptr:
+                write_matrix_to_file_ascii(file_ptr, self.td_coocc)
 
-        if alpha > 0:
-            with open(os.path.join(folder_path, "c_matrix"), "wb") as file_ptr:
-                write_matrix_to_file_ascii(file_ptr, c_matrix)
+            if self.alpha > 0:
+                with open(os.path.join(folder_path, "c_matrix"), "wb") as file_ptr:
+                    write_matrix_to_file_ascii(file_ptr, self.cost_vol)
 
-        with open(os.path.join(folder_path, "config.txt"), "w") as file_ptr:
-            file_ptr.write(
-                return_config_text(
-                    ["PATH"], alpha, os.path.relpath(folder_path, "."), "graphm_output"
+            with open(
+                os.path.join(folder_path, "config.txt"), "w", encoding="utf-8"
+            ) as file_ptr:
+                file_ptr.write(
+                    return_config_text(
+                        ["PATH"],
+                        self.alpha,
+                        os.path.relpath(folder_path, "."),
+                        "graphm_output",
+                    )
                 )
+
+            test_script_path = os.path.join(folder_path, "run_script")
+            with open(test_script_path, "w", encoding="utf-8") as file_ptr:
+                file_ptr.write("#!/bin/sh\n")
+                file_ptr.write(
+                    f"{GRAPHM_PATH} {os.path.relpath(folder_path, '.')}/config.txt\n"
+                )
+            os_st = os.stat(test_script_path)
+            os.chmod(test_script_path, os_st.st_mode | stat.S_IEXEC)
+
+            # RUN THE ATTACK
+            subprocess.run(
+                [os.path.join(folder_path, "run_script")],
+                capture_output=True,
+                check=True,
             )
 
-        test_script_path = os.path.join(folder_path, "run_script")
-        with open(test_script_path, "w") as file_ptr:
-            file_ptr.write("#!/bin/sh\n")
-            file_ptr.write(
-                "{:s}/graphm {:s}/config.txt\n".format(
-                    os.path.relpath(GRAPHM_PATH, ""), os.path.relpath(folder_path, ".")
-                )
-            )
-        os_st = os.stat(test_script_path)
-        os.chmod(test_script_path, os_st.st_mode | stat.S_IEXEC)
+            results = []
+            with open(
+                os.path.relpath(folder_path, ".") + "/graphm_output",
+                "r",
+                encoding="utf-8",
+            ) as file_ptr:
+                while file_ptr.readline() != "Permutations:\n":
+                    pass
+                file_ptr.readline()  # This is the line with the attack names (only PATH, in theory)
+                for line in file_ptr:
+                    results.append(int(line) - 1)  # Line should be a single integer now
 
-        # RUN THE ATTACK
-        subprocess.run([os.path.join(folder_path, "run_script")], capture_output=True)
+            query_predictions_for_each_tag = {}
+            for i, tag in enumerate(self.sorted_trapdoors):
+                query_predictions_for_each_tag[tag] = self.sorted_keywords[
+                    results.index(i)
+                ]
+        except:
+            shutil.rmtree(folder_path)
+            raise
 
-        results = []
-        with open(
-            os.path.relpath(folder_path, ".") + "/graphm_output", "r"
-        ) as file_ptr:
-            while file_ptr.readline() != "Permutations:\n":
-                pass
-            file_ptr.readline()  # This is the line with the attack names (only PATH, in theory)
-            for line in file_ptr:
-                results.append(int(line) - 1)  # Line should be a single integer now
-
-        query_predictions_for_each_tag = {}
-        for tag in tag_list:
-            query_predictions_for_each_tag[tag] = self.sorted_keywords[
-                results.index(tag)
-            ]
-
-        if clean_after_attack:
-            os.remove(os.path.join(folder_path, "graph_1"))
-            os.remove(os.path.join(folder_path, "graph_2"))
-            if alpha > 0:
-                os.remove(os.path.join(folder_path, "c_matrix"))
-            os.remove(os.path.join(folder_path, "config.txt"))
-            os.remove(os.path.join(folder_path, "run_script"))
-            os.remove(os.path.relpath(folder_path, ".") + "/graphm_output")
-            os.rmdir(folder_path)
-
+        shutil.rmtree(folder_path)
         return query_predictions_for_each_tag
 
 
