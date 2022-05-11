@@ -81,9 +81,7 @@ def enron_metric_sensivity():
     extractor = enron_extractor(VOC_SIZE)
     occ_mat = extractor.occ_array
 
-    with open(
-        "results/enron_sim_acc.csv", "w", newline="", encoding="utf-8"
-    ) as csvfile:
+    with open("enron_sim_acc.csv", "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = [
             "Nb similar docs",
             "Nb server docs",

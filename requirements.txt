@@ -1,6 +1,8 @@
 colorlog
 pandas
+bs4
 nltk
 numpy
 scipy
 tqdm
+matplotlib

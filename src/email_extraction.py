@@ -47,7 +47,7 @@ def get_body_from_mboxmsg(msg):
     return body
 
 
-def extract_enron_sent_emails(maildir_directory="../maildir/") -> pd.DataFrame:
+def extract_enron_sent_emails(maildir_directory="./maildir/") -> pd.DataFrame:
     """Extract the emails from the _sent_mail folder of each Enron mailbox."""
     path = os.path.expanduser(maildir_directory)
     mails = glob.glob(f"{path}/*/_sent_mail/*")
@@ -61,7 +61,7 @@ def extract_enron_sent_emails(maildir_directory="../maildir/") -> pd.DataFrame:
     return pd.DataFrame(data={"filename": mails, "mail_body": mail_contents})
 
 
-def extract_apache_ml(maildir_directory="../apache_ml/") -> pd.DataFrame:
+def extract_apache_ml(maildir_directory="./apache_ml/") -> pd.DataFrame:
     """Extract all the emails sent on the Apache Lucene mailing list between 2002 and 2011."""
     path = os.path.expanduser(maildir_directory)
     mails = glob.glob(f"{path}/*")
@@ -76,7 +76,7 @@ def extract_apache_ml(maildir_directory="../apache_ml/") -> pd.DataFrame:
 
 
 def extract_apache_ml_by_year(
-    from_year=2002, to_year=2012, maildir_directory="../apache_ml/"
+    from_year=2002, to_year=2012, maildir_directory="./apache_ml/"
 ) -> pd.DataFrame:
     path = os.path.expanduser(maildir_directory)
     mail_contents = []
@@ -92,7 +92,7 @@ def extract_apache_ml_by_year(
     return pd.DataFrame(data={"filename": mail_ids, "mail_body": mail_contents})
 
 
-def extract_blogs(blog_dir="../blogs") -> pd.DataFrame:
+def extract_blogs(blog_dir="./blogs") -> pd.DataFrame:
     path = os.path.expanduser(blog_dir)
     blogs = glob.glob(f"{path}/*")
     posts = []
