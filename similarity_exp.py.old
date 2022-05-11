@@ -3,7 +3,7 @@ import csv
 import numpy as np
 import scipy
 
-from src.common import KeywordExtractor, compute_occ_mat
+from src.keyword_extract import KeywordExtractor, compute_occ_mat
 from src.query_generator import QueryResultExtractor
 from src.email_extraction import (
     extract_sent_mail_contents,

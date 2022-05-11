@@ -2,8 +2,10 @@
 """
 
 import email
+import functools
 import glob
 import mailbox
+import pickle
 import os
 
 import colorlog
@@ -11,6 +13,8 @@ import pandas as pd
 import tqdm
 
 from bs4 import BeautifulSoup
+
+from .keyword_extract import KeywordExtractor
 
 logger = colorlog.getLogger("RaaC paper")
 
@@ -38,20 +42,19 @@ def get_body_from_mboxmsg(msg):
         if part.get_content_type() == "text/plain":
             parts.append(part.get_payload())
     body = "".join(parts)
-    body = body.split("To unsubscribe")[
-        0
-    ]  # at the end of each email of the mailing list.
+    # Remove the mailing list signature
+    body = body.split("To unsubscribe", maxsplit=1)[0]
     return body
 
 
-def extract_sent_mail_contents(maildir_directory="../maildir/") -> pd.DataFrame:
+def extract_enron_sent_emails(maildir_directory="../maildir/") -> pd.DataFrame:
     """Extract the emails from the _sent_mail folder of each Enron mailbox."""
     path = os.path.expanduser(maildir_directory)
     mails = glob.glob(f"{path}/*/_sent_mail/*")
 
     mail_contents = []
     for mailfile_path in tqdm.tqdm(iterable=mails, desc="Reading the emails"):
-        with open(mailfile_path, "r") as mailfile:
+        with open(mailfile_path, "r", encoding="utf-8") as mailfile:
             raw_mail = mailfile.read()
             mail_contents.append(get_body_from_enron_email(raw_mail))
 
@@ -96,7 +99,7 @@ def extract_blogs(blog_dir="../blogs") -> pd.DataFrame:
     post_ids = []
 
     for blog_path in tqdm.tqdm(iterable=blogs, desc="Reading the blogs"):
-        with open(blog_path, "r", errors="ignore") as blog_file:
+        with open(blog_path, "r", errors="ignore", encoding="utf-8") as blog_file:
             blog = blog_file.read()
 
         soup = BeautifulSoup(blog, "xml")
@@ -107,3 +110,29 @@ def extract_blogs(blog_dir="../blogs") -> pd.DataFrame:
             i += 1
 
     return pd.DataFrame(data={"filename": post_ids, "mail_body": posts})
+
+
+def generic_extractor(extract_function, dataset_name, voc_size):
+    file_name = f"{dataset_name}_extractor_{voc_size}.pkl"
+    if not os.path.isfile(file_name):
+        docs = extract_function()
+        extractor = KeywordExtractor(docs, voc_size)
+        with open(file_name, "wb") as pkl_file:
+            pickle.dump(extractor, pkl_file)
+    else:
+        with open(file_name, "rb") as pkl_file:
+            extractor = pickle.load(pkl_file)
+    return extractor
+
+
+enron_extractor = functools.partial(
+    generic_extractor, extract_enron_sent_emails, "enron"
+)
+
+apache_extractor = functools.partial(generic_extractor, extract_apache_ml, "apache")
+
+blogs_extractor = functools.partial(generic_extractor, extract_blogs, "blogs")
+
+apache_by_year_extractor = functools.partial(
+    generic_extractor, extract_apache_ml_by_year, "apache_by_year"
+)

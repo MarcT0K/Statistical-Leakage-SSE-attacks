@@ -7,7 +7,7 @@ import colorlog
 import numpy as np
 
 from .utils import KeywordAttacker
-from ..common import poolcontext
+from ..keyword_extract import poolcontext
 
 logger = colorlog.getLogger("RaaC paper")
 
@@ -82,7 +82,7 @@ class AbstractScoreAttacker(KeywordAttacker):
             try:
                 trapdoor_ind = self.td_voc_info[trapdoor]["vector_ind"]
             except KeyError:
-                logger.warning(f"Unknown trapdoor: {trapdoor}")
+                logger.warning("Unknown trapdoor: %s", trapdoor)
                 prediction.append((trapdoor, "", 0))
                 continue
             trapdoor_vec = self.td_reduced_coocc[trapdoor_ind]

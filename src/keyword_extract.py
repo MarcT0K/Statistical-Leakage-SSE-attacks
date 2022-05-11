@@ -1,6 +1,5 @@
 import logging
 import multiprocessing
-import random
 
 from functools import reduce
 from contextlib import contextmanager
@@ -63,23 +62,39 @@ class OccRowComputer:
         return [int(voc_word in word_list) for voc_word in self.voc]
 
 
+def compute_occ_mat(corpus_df, sorted_voc_with_occ):
+    freq_dict = {}
+    # Word tokenization
+    nb_cores = multiprocessing.cpu_count()
+    with poolcontext(processes=nb_cores) as pool:
+        results = pool.starmap(
+            KeywordExtractor.extract_email_voc,
+            enumerate(np.array_split(corpus_df, nb_cores)),
+        )
+        freq_dict, _ = reduce(KeywordExtractor._merge_results, results)
+
+    return KeywordExtractor.build_occurrence_array(
+        sorted_voc_with_occ=sorted_voc_with_occ, freq_dict=freq_dict
+    )
+
+
 class KeywordExtractor:
     """Class to extract the keyword from a corpus/email set"""
 
-    def __init__(self, corpus_df, voc_size=100, min_freq=1):
+    def __init__(self, corpus_df, voc_size=100):
         glob_freq_dict = {}
         freq_dict = {}
         # Word tokenization
-        NUM_CORES = multiprocessing.cpu_count()
-        with poolcontext(processes=NUM_CORES) as pool:
+        nb_cores = multiprocessing.cpu_count()
+        with poolcontext(processes=nb_cores) as pool:
             results = pool.starmap(
-                self.extract_email_voc, enumerate(np.array_split(corpus_df, NUM_CORES))
+                self.extract_email_voc, enumerate(np.array_split(corpus_df, nb_cores))
             )
             freq_dict, glob_freq_dict = reduce(self._merge_results, results)
 
         del corpus_df
         logger.info(
-            f"Number of unique words (except the stopwords): {len(glob_freq_dict)}"
+            "Number of unique words (except the stopwords): %d", len(glob_freq_dict)
         )
 
         # Creation of the vocabulary
@@ -91,11 +106,11 @@ class KeywordExtractor:
             else glob_freq_list.most_common()
         )
         self.sorted_voc_with_occ = sorted(
-            [(word, count) for word, count in glob_freq_list if count >= min_freq],
+            [(word, count) for word, count in glob_freq_list],
             key=lambda d: d[1],
             reverse=True,
         )
-        logger.info(f"Vocabulary size: {len(self.sorted_voc_with_occ)}")
+        logger.info("Vocabulary size: %d", len(self.sorted_voc_with_occ))
         del glob_freq_list
 
         # Creation of the occurrence matrix
@@ -177,43 +192,3 @@ class KeywordExtractor:
                 occ_list.append(row)
 
         return np.array(occ_list, dtype=np.float64)
-
-
-def compute_occ_mat(corpus_df, sorted_voc_with_occ):
-    freq_dict = {}
-    # Word tokenization
-    NUM_CORES = multiprocessing.cpu_count()
-    with poolcontext(processes=NUM_CORES) as pool:
-        results = pool.starmap(
-            KeywordExtractor.extract_email_voc,
-            enumerate(np.array_split(corpus_df, NUM_CORES)),
-        )
-        freq_dict, _ = reduce(KeywordExtractor._merge_results, results)
-
-    return KeywordExtractor.build_occurrence_array(
-        sorted_voc_with_occ=sorted_voc_with_occ, freq_dict=freq_dict
-    )
-
-
-def generate_known_queries(
-    similar_wordlist: List[str], stored_wordlist: List[str], nb_queries: int
-) -> Dict[str, str]:
-    """Extract random keyword which are present in the similar document set
-    and in the server. So the pairs (similar_keyword, trapdoor_keyword) will
-    be considered as known queries. Since the trapdoor words are not hashed
-    the tuples will be like ("word","word"). We could only return the keywords
-    but this tuple represents well what an attacer would have, i.e. tuple linking
-    one keyword to a trapdoor they has seen.
-
-    NB: the length of the server wordlist is the number of possible queries
-
-    Arguments:
-        similar_wordlist {List[str]} -- List of the keywords of the similar vocabulary
-        trapdoor_wordlist {List[str]} -- List of the keywords of the server vocabulary
-        nb_queries {int} -- Number of queries wanted
-
-    Returns:
-        Dict[str,str] -- dictionary containing known queries
-    """
-    candidates = set(similar_wordlist).intersection(stored_wordlist)
-    return {word: word for word in random.sample(candidates, nb_queries)}

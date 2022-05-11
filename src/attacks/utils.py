@@ -32,13 +32,13 @@ class KeywordAttacker(ABC):
             for ind, word in enumerate(trapdoor_sorted_voc)
         }
 
-        for kw in self.kw_voc_info.keys():
-            self.kw_voc_info[kw]["word_freq"] = (
-                self.kw_voc_info[kw]["word_occ"] / self.nb_similar_docs
+        for word in self.kw_voc_info.keys():
+            self.kw_voc_info[word]["word_freq"] = (
+                self.kw_voc_info[word]["word_occ"] / self.nb_similar_docs
             )
-        for td in self.td_voc_info.keys():
-            self.td_voc_info[td]["word_freq"] = (
-                self.td_voc_info[td]["word_occ"] / self.nb_indexed_docs
+        for trapd in self.td_voc_info.keys():
+            self.td_voc_info[trapd]["word_freq"] = (
+                self.td_voc_info[trapd]["word_occ"] / self.nb_indexed_docs
             )
 
     def _compute_coocc_matrices(
@@ -66,15 +66,15 @@ class KeywordAttacker(ABC):
         raise NotImplementedError
 
 
-def _log_binomial(n, beta):
+def _log_binomial(n_obs, beta):
     """Computes an approximation of log(binom(n, n*alpha)) for alpha < 1"""
     if beta == 0 or beta == 1:
         return 0
     elif beta < 0 or beta > 1:
-        raise ValueError("beta cannot be negative or greater than 1 ({})".format(beta))
+        raise ValueError(f"Beta cannot be negative or greater than 1 ({beta})")
     else:
         entropy = -beta * np.log(beta) - (1 - beta) * np.log(1 - beta)
-        return n * entropy - 0.5 * np.log(2 * np.pi * n * beta * (1 - beta))
+        return n_obs * entropy - 0.5 * np.log(2 * np.pi * n_obs * beta * (1 - beta))
 
 
 def compute_log_binomial_probability_matrix(ntrials, probabilities, observations):
