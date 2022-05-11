@@ -16,7 +16,8 @@ class KeywordAttacker(ABC):
         trapdoor_sorted_voc: List[str],
         nb_stored_docs: int,
     ):
-
+        self.kw_coocc = None
+        self.td_coocc = None
         self.nb_similar_docs = keyword_occ_array.shape[0]
         self.nb_indexed_docs = nb_stored_docs
 
@@ -56,14 +57,11 @@ class KeywordAttacker(ABC):
         np.fill_diagonal(self.td_coocc, 0)
 
     @abstractmethod
-    def predict(self) -> Dict[str, List[str]]:
+    def predict(self) -> Dict[str, str]:
         """Returns a prediction for each unknown trapdoor.
 
-        Args:
-            trapdoor_list (List[str]): list of trapdoors to attack.
-
         Returns:
-            Dict[str, List[str]]: dictionary with a prediction per trapdoor
+            Dict[str, str]: dictionary with a prediction per trapdoor
         """
         raise NotImplementedError
 

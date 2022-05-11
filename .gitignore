@@ -132,4 +132,4 @@ dmypy.json
 *.csv
 .vscode
 *.pkl
-results/
+tmp_results/

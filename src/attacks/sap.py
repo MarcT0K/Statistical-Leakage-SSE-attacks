@@ -13,6 +13,7 @@ class SAPAttacker(KeywordAttacker):
         keyword_sorted_voc: List[str],
         trapdoor_sorted_voc: List[str],
         nb_stored_docs: int,
+        **kwargs
     ):
         super().__init__(
             keyword_occ_array,
@@ -22,7 +23,7 @@ class SAPAttacker(KeywordAttacker):
             nb_stored_docs,
         )
         self.sorted_keywords = keyword_sorted_voc
-        self.sorted_trapdoors =trapdoor_sorted_voc
+        self.sorted_trapdoors = trapdoor_sorted_voc
 
     def predict(self):
         kw_probs_train = list(

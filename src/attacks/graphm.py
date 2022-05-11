@@ -30,21 +30,19 @@ class GraphMatchingAttacker(KeywordAttacker):
         self.alpha = 0.5
 
         kw_probs_train = list(
-            [
-                info["word_occ"] / self.nb_similar_docs
-                for _word, info in self.kw_voc_info.items()
-            ]
+            [self.kw_voc_info[word]["word_freq"] for word in self.sorted_keywords]
         )  # from the similar data set
+        print(kw_probs_train)
         kw_counts_test = list(
-            [info["word_occ"] for _td, info in self.td_voc_info.items()]
+            [self.td_voc_info[td]["word_occ"] for td in self.sorted_trapdoors]
         )  # from the leakage
+        print(kw_counts_test)
+        print(self.nb_indexed_docs, self.nb_similar_docs)
 
         # Computing the cost matrix
-        log_prob_matrix = compute_log_binomial_probability_matrix(
+        self.cost_vol = compute_log_binomial_probability_matrix(
             self.nb_indexed_docs, kw_probs_train, kw_counts_test
         )
-
-        self.cost_vol = -log_prob_matrix
 
     def set_alpha(self, new_alpha: float):
         assert new_alpha >= 0 and new_alpha <= 1
@@ -115,7 +113,8 @@ class GraphMatchingAttacker(KeywordAttacker):
             shutil.rmtree(folder_path)
             raise
 
-        shutil.rmtree(folder_path)
+        # shutil.rmtree(folder_path)
+        print(query_predictions_for_each_tag)
         return query_predictions_for_each_tag
 
 
