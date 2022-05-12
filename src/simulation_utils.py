@@ -46,11 +46,14 @@ def generate_adv_knowledge(
     assert 0 < ind_prop and ind_prop <= 1
     if sim_data_atk:
         assert ind_prop + atk_prop <= 1
+    else:
+        assert atk_prop <= ind_prop
 
     n_tot = occ_mat.shape[0]
-    choice_ind = np.random.choice(
-        range(n_tot), size=(int(n_tot * ind_prop),), replace=False
-    )
+    nb_ind_docs = int(n_tot * ind_prop)
+    nb_atk_docs = int(n_tot * atk_prop)
+
+    choice_ind = np.random.choice(range(n_tot), size=(nb_ind_docs,), replace=False)
     ind_docs = np.zeros(n_tot, dtype=bool)
     ind_docs[choice_ind] = True
     ind_mat = occ_mat[ind_docs, :]
@@ -62,7 +65,7 @@ def generate_adv_knowledge(
     atk_max_docs = full_atk_mat.shape[0]
     atk_choice = np.random.choice(
         range(atk_max_docs),
-        size=(int(atk_max_docs * atk_prop),),
+        size=(nb_atk_docs,),
         replace=False,
     )
     atk_mat = full_atk_mat[atk_choice, :]
