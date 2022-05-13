@@ -18,6 +18,8 @@ VOC_SIZE = 500
 QUERYSET_SIZE = 200
 KNOWN_QUERIES = 15
 
+# TODO: add attack running time in the csvs
+
 
 def similarity_exploration():
     extractor = apache_extractor(VOC_SIZE)
@@ -85,7 +87,7 @@ def atk_comparison():
             "Nb similar docs",
             "Nb server docs",
             "Voc size",
-            "Nb queries",
+            "Nb queries observed",
             "Nb queries known",
             "Epsilon",
             "Score Acc",
@@ -154,7 +156,7 @@ def atk_comparison():
                     "Nb similar docs": atk_mat.shape[0],
                     "Nb server docs": ind_mat.shape[0],
                     "Voc size": len(voc),
-                    "Nb queries": len(queries),
+                    "Nb queries observed": len(queries),
                     "Nb queries known": len(known_queries),
                     "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
                     "Score Acc": score_acc,
@@ -164,8 +166,8 @@ def atk_comparison():
             )
 
 
-def generate_ref_score_results(extractor, dataset_name, truncation_size=-1):
-    extractor = enron_extractor(VOC_SIZE)
+def generate_ref_score_results(extractor_function, dataset_name, truncation_size=-1):
+    extractor = extractor_function(VOC_SIZE)
     occ_mat = extractor.occ_array
 
     if truncation_size != -1:
@@ -183,7 +185,7 @@ def generate_ref_score_results(extractor, dataset_name, truncation_size=-1):
             "Nb similar docs",
             "Nb server docs",
             "Voc size",
-            "Nb queries",
+            "Nb queries observed",
             "Nb queries known",
             "Epsilon",
             "Refined Score Acc",
@@ -228,10 +230,98 @@ def generate_ref_score_results(extractor, dataset_name, truncation_size=-1):
                     "Nb similar docs": atk_mat.shape[0],
                     "Nb server docs": ind_mat.shape[0],
                     "Voc size": len(voc),
-                    "Nb queries": len(queries),
+                    "Nb queries observed": len(queries),
                     "Nb queries known": len(known_queries),
                     "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
                     "Refined Score Acc": ref_acc,
+                }
+            )
+
+
+def risk_assessment():
+    extractor = enron_extractor(VOC_SIZE)
+    occ_mat = extractor.occ_array
+
+    with open("risk_assessment.csv", "w", newline="", encoding="utf-8") as csvfile:
+        fieldnames = [
+            "Nb similar docs",
+            "Nb server docs",
+            "Voc size",
+            "Nb queries observed",
+            "Nb queries known",
+            "Epsilon",
+            "Score Acc",
+            "Refined Score Acc",
+            "IHOP Acc",
+        ]
+        writer = csv.DictWriter(csvfile, delimiter=";", fieldnames=fieldnames)
+        writer.writeheader()
+        for i, j in tqdm.tqdm(
+            iterable=[
+                (i, j) for i in range(1, 11) for j in range(1, 11) for k in range(1)
+            ],
+            desc="Running the experiments",
+        ):
+            # Auxiliary knowledge generation
+            voc = list(extractor.get_sorted_voc())
+            (
+                ind_mat,
+                atk_mat,
+                queries,
+                queries_ind,  # Even if we observe all queries, we want their order
+                known_queries,
+            ) = generate_adv_knowledge(
+                occ_mat, i * 0.05, j * 0.05, voc, VOC_SIZE, KNOWN_QUERIES
+            )
+
+            # Score attack
+            score_acc = simulate_attack(
+                ScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=ind_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # Refined score attack
+            ref_acc = simulate_attack(
+                RefinedScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=ind_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # IHOP attack
+            ihop_acc = simulate_attack(
+                IHOPAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=ind_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # Compute espilon-similarity
+            ind_doc_coocc = ind_mat.T @ ind_mat / ind_mat.shape[0]
+            atk_full_coocc = atk_mat.T @ atk_mat / atk_mat.shape[0]
+
+            writer.writerow(
+                {
+                    "Nb similar docs": atk_mat.shape[0],
+                    "Nb server docs": ind_mat.shape[0],
+                    "Voc size": len(voc),
+                    "Nb queries observed": len(queries),
+                    "Nb queries known": len(known_queries),
+                    "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
+                    "Score Acc": score_acc,
+                    "Refined Score Acc": ref_acc,
+                    "IHOP Acc": ihop_acc,
                 }
             )
 
