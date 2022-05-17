@@ -9,16 +9,13 @@ import tqdm
 from src.simulation_utils import simulate_attack, generate_adv_knowledge
 from src.email_extraction import enron_extractor, apache_extractor, blogs_extractor
 from src.attacks.score import RefinedScoreAttacker, ScoreAttacker
-from src.attacks.graphm import GraphMatchingAttacker
 from src.attacks.ihop import IHOPAttacker
 
 epsilon_sim = lambda coocc_1, coocc_2: np.linalg.norm(coocc_1 - coocc_2)
 
-VOC_SIZE = 500
-QUERYSET_SIZE = 200
+VOC_SIZE = 1000
+QUERYSET_SIZE = 300
 KNOWN_QUERIES = 15
-
-# TODO: add attack running time in the csvs
 
 
 def similarity_exploration():
@@ -91,10 +88,13 @@ def atk_comparison():
             "Nb queries known",
             "Epsilon",
             "Score Acc",
+            "Score Runtime",
             "Refined Score Acc",
+            "Refined Score Runtime",
             "IHOP Acc",
+            "IHOP Runtime",
         ]
-        writer = csv.DictWriter(csvfile, delimiter=";", fieldnames=fieldnames)
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for i, j in tqdm.tqdm(
             iterable=[
@@ -115,7 +115,7 @@ def atk_comparison():
             )
 
             # Score attack
-            score_acc = simulate_attack(
+            score_acc, score_runtime = simulate_attack(
                 ScoreAttacker,
                 keyword_occ_array=atk_mat,
                 keyword_sorted_voc=voc,
@@ -126,7 +126,7 @@ def atk_comparison():
             )
 
             # Refined score attack
-            ref_acc = simulate_attack(
+            ref_acc, ref_score_runtime = simulate_attack(
                 RefinedScoreAttacker,
                 keyword_occ_array=atk_mat,
                 keyword_sorted_voc=voc,
@@ -137,7 +137,7 @@ def atk_comparison():
             )
 
             # IHOP attack
-            ihop_acc = simulate_attack(
+            ihop_acc, ihop_runtime = simulate_attack(
                 IHOPAttacker,
                 keyword_occ_array=atk_mat,
                 keyword_sorted_voc=voc,
@@ -160,8 +160,11 @@ def atk_comparison():
                     "Nb queries known": len(known_queries),
                     "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
                     "Score Acc": score_acc,
+                    "Score Runtime": score_runtime,
                     "Refined Score Acc": ref_acc,
+                    "Refined Score Runtime": ref_score_runtime,
                     "IHOP Acc": ihop_acc,
+                    "IHOP Runtime": ihop_runtime,
                 }
             )
 
@@ -190,7 +193,7 @@ def generate_ref_score_results(extractor_function, dataset_name, truncation_size
             "Epsilon",
             "Refined Score Acc",
         ]
-        writer = csv.DictWriter(csvfile, delimiter=";", fieldnames=fieldnames)
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for i, j in tqdm.tqdm(
             iterable=[
@@ -211,7 +214,7 @@ def generate_ref_score_results(extractor_function, dataset_name, truncation_size
             )
 
             # Refined score attack
-            ref_acc = simulate_attack(
+            ref_acc, _runtime = simulate_attack(
                 RefinedScoreAttacker,
                 keyword_occ_array=atk_mat,
                 keyword_sorted_voc=voc,
@@ -254,7 +257,7 @@ def risk_assessment():
             "Refined Score Acc",
             "IHOP Acc",
         ]
-        writer = csv.DictWriter(csvfile, delimiter=";", fieldnames=fieldnames)
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for i, j in tqdm.tqdm(
             iterable=[
@@ -338,3 +341,4 @@ if __name__ == "__main__":
     generate_ref_score_results(apache_extractor, "apache")
     generate_ref_score_results(apache_extractor, "apache_reduced", 30000)
     generate_ref_score_results(blogs_extractor, "blogs")
+    generate_ref_score_results(blogs_extractor, "blogs_reduced", 30000)

@@ -1,6 +1,8 @@
 import random
 
-from typing import List, Dict
+from datetime import datetime
+from typing import List, Dict, Tuple
+from xmlrpc.client import DateTime
 
 import colorlog
 import numpy as np
@@ -80,7 +82,12 @@ def generate_adv_knowledge(
     return ind_mat, atk_mat, queries, queries_ind, known_queries
 
 
-def simulate_attack(attack_class, **kwargs) -> float:
+def simulate_attack(attack_class, **kwargs) -> Tuple[float, float]:
     attacker = attack_class(**kwargs)
+    start = datetime.now()
     pred = attacker.predict()
-    return np.mean([word == candidate for word, candidate in pred.items()])
+    end = datetime.now()
+
+    acc = np.mean([word == candidate for word, candidate in pred.items()])
+    runtime = (end - start).total_seconds()
+    return acc, runtime
