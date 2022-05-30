@@ -6,14 +6,18 @@ import os
 import numpy as np
 import tqdm
 
-from src.simulation_utils import simulate_attack, generate_adv_knowledge
+from src.simulation_utils import (
+    generate_adv_knowledge_fixed_nb_docs,
+    simulate_attack,
+    generate_adv_knowledge,
+)
 from src.email_extraction import enron_extractor, apache_extractor, blogs_extractor
 from src.attacks.score import RefinedScoreAttacker, ScoreAttacker
 from src.attacks.ihop import IHOPAttacker
 
 epsilon_sim = lambda coocc_1, coocc_2: np.linalg.norm(coocc_1 - coocc_2)
 
-VOC_SIZE = 1000
+VOC_SIZE = 500
 QUERYSET_SIZE = 300
 KNOWN_QUERIES = 15
 
@@ -252,6 +256,14 @@ def risk_assessment():
     extractor = enron_extractor(VOC_SIZE)
     occ_mat = extractor.occ_array
 
+    n_docs = occ_mat.shape[0]
+    min_docs = 500
+    assert n_docs > min_docs
+
+    # Sum = 1/n_atk + 1/n_ind but we consider n_atk = n_ind for simplicity => Sum = 2/n_atk
+    min_sum = 2 / (n_docs * 0.5)
+    max_sum = 2 / min_docs
+
     with open("risk_assessment.csv", "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = [
             "Nb similar docs",
@@ -266,12 +278,12 @@ def risk_assessment():
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        for i, j in tqdm.tqdm(
-            iterable=[
-                (i, j) for i in range(1, 11) for j in range(1, 11) for k in range(1)
-            ],
+        for i in tqdm.tqdm(
+            iterable=[i for i in range(51) for k in range(1)],
             desc="Running the experiments",
         ):
+            curr_sum = (max_sum - min_sum) * (i * 2) / 100 + min_sum
+            curr_n = int(2 / curr_sum)
             # Auxiliary knowledge generation
             voc = list(extractor.get_sorted_voc())
             (
@@ -280,12 +292,12 @@ def risk_assessment():
                 queries,
                 queries_ind,  # Even if we observe all queries, we want their order
                 known_queries,
-            ) = generate_adv_knowledge(
-                occ_mat, i * 0.05, j * 0.05, voc, VOC_SIZE, KNOWN_QUERIES
+            ) = generate_adv_knowledge_fixed_nb_docs(
+                occ_mat, curr_n, curr_n, voc, VOC_SIZE, KNOWN_QUERIES
             )
 
             # Score attack
-            score_acc = simulate_attack(
+            score_acc, _runtime = simulate_attack(
                 ScoreAttacker,
                 keyword_occ_array=atk_mat,
                 keyword_sorted_voc=voc,
@@ -296,7 +308,7 @@ def risk_assessment():
             )
 
             # Refined score attack
-            ref_acc = simulate_attack(
+            ref_acc, _runtime = simulate_attack(
                 RefinedScoreAttacker,
                 keyword_occ_array=atk_mat,
                 keyword_sorted_voc=voc,
@@ -307,7 +319,7 @@ def risk_assessment():
             )
 
             # IHOP attack
-            ihop_acc = simulate_attack(
+            ihop_acc, _runtime = simulate_attack(
                 IHOPAttacker,
                 keyword_occ_array=atk_mat,
                 keyword_sorted_voc=voc,
