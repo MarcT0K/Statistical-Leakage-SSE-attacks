@@ -241,6 +241,13 @@ def generate_ref_score_results(extractor_function, dataset_name, truncation_size
             )
 
 
+# TODO: problem take 100 hours with VOC_SIZE=1K (24 with VOC_SIZE=500K)
+# Solution 1: Add smaller proportions (<1K documents per document set)
+# Solution 2: have more repetitions for lower document set size to have an equal number of repetitions per chunk
+# Solution 3: fix n_1 and n_2 to have a uniform coverage of the x space (always repeat with a mirror situation e.g. (n, n') AND (n',n))
+# Solution 3bis: always use n_atk = n_ind to simplify the coverage
+# Solution 4: study specifically IHOP for this risk assessment analysis and only compare the curves of the quantile regression for all attacks
+# Solution 5: change how the vocabulary is generated
 def risk_assessment():
     extractor = enron_extractor(VOC_SIZE)
     occ_mat = extractor.occ_array
