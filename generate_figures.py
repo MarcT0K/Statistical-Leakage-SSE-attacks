@@ -7,22 +7,33 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from cycler import cycler
 from sklearn.linear_model import LinearRegression, QuantileRegressor
 
 epsilon_sim = lambda coocc_1, coocc_2: np.linalg.norm(coocc_1 - coocc_2)
 
 params = {
     "text.usetex": True,
-    "font.family": "sans-serif",
     "text.latex.preamble": [r"\usepackage{amssymb}", r"\usepackage{amsmath}"],
-    "font.size": 22,
-    "hatch.linewidth": 2,
-    "hatch.color": "white",
+    "font.size": 15,
+    "axes.labelsize": 25,
+    "axes.grid": True,
+    "grid.linestyle": "dashed",
+    "grid.alpha": 0.7,
+    "scatter.marker": "x",
 }
+plt.style.use("seaborn-colorblind")
+plt.rc(
+    "axes",
+    prop_cycle=(
+        plt.rcParams["axes.prop_cycle"]
+        + cycler("linestyle", ["-", "--", "-.", ":", "-", "-"])
+    ),
+)
 plt.rcParams.update(params)
 
 
-def fig_subsec_4C(show=True):
+def fig_epsilon_nb_docs():
     with open("fig_subsec_4C.csv", "r", encoding="utf-8") as csvfile:
         csvfile.readline()
         arr = np.loadtxt(csvfile, delimiter=",")
@@ -37,9 +48,8 @@ def fig_subsec_4C(show=True):
     plt.text(0.0005, 3.7, f"Slope: {a:.2f}\nIntercept: {b:.4f}")
     plt.grid()
     plt.tight_layout()
-    plt.savefig("fig_subsec_4C.png", dpi=400)
-    if show:
-        plt.show()
+    plt.savefig("epsilon_nb_docs.png", dpi=400)
+    plt.cla()
 
     mask = arr[:, 0] == 2023  # n_atk fixed
     x = 1 / arr[mask, 1]
@@ -52,9 +62,8 @@ def fig_subsec_4C(show=True):
     plt.text(0.00001, 2.8, f"Slope: {a:.2f}\nIntercept: {b:.4f}")
     plt.grid()
     plt.tight_layout()
-    plt.savefig("fig_subsec_4C_n_atk_fixed.png", dpi=400)
-    if show:
-        plt.show()
+    plt.savefig("epsilon_n_atk_fixed.png", dpi=400)
+    plt.cla()
 
     mask = arr[:, 1] == 1820  # n_ind fixed
     x = 1 / arr[mask, 0]
@@ -67,51 +76,121 @@ def fig_subsec_4C(show=True):
     plt.text(0.00001, 3.5, f"Slope: {a:.2f}\nIntercept: {b:.4f}")
     plt.grid()
     plt.tight_layout()
-    plt.savefig("fig_subsec_4C_n_ind_fixed.png", dpi=400)
-    if show:
-        plt.show()
+    plt.savefig("epsilon_n_ind_fixed.png", dpi=400)
+    plt.cla()
 
 
-def fig_risk_assessment():
-    dataframe = pd.read_csv("risk_assessment.csv")
-    logit = lambda p: np.log(p / (1 - p))
-    posit = lambda alpha: np.exp(alpha) / (1 + np.exp(alpha))
+logit = lambda p: np.log(p / (1 - p))
+posit = lambda alpha: np.exp(alpha) / (1 + np.exp(alpha))
+QUANTILE = 0.95
 
-    # Linear vs. Quantile regression comparison
+
+def data_to_xy(dataframe, col_name):
     x = np.log(1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"])
-    y = logit(dataframe["IHOP Acc"])
+    y = logit(dataframe[col_name])
 
     mask = y != np.inf
     assert sum(~mask) < 10  # To avoid removing too many points
 
     y = y[mask].to_numpy()
     x = x[mask].to_numpy()
-    plt.scatter(x, y)
+    return x, y
 
-    linear_regression = LinearRegression().fit(x.reshape(-1, 1), y.reshape(-1, 1))
+
+def data_to_quant_reg(dataframe, col_name, quantile=QUANTILE):
+    x, y = data_to_xy(dataframe, col_name)
+    quant_regression = QuantileRegressor(quantile=quantile, alpha=0).fit(
+        x.reshape(-1, 1), y
+    )
+    slope = quant_regression.coef_[0]
+    intercept = quant_regression.intercept_
+    return slope, intercept
+
+
+def fig_indiv_risk_assessment(col_name):
+    fig, ax = plt.subplots()
+    dataframe = pd.read_csv("risk_assessment.csv")
+
+    log_x, log_y = data_to_xy(dataframe, col_name)
+    linear_regression = LinearRegression().fit(
+        log_x.reshape(-1, 1), log_y.reshape(-1, 1)
+    )
     lin_slope = linear_regression.coef_[0, 0]
     lin_intercept = linear_regression.intercept_[0]
-    plt.axline((x[0], x[0] * lin_slope + lin_intercept), slope=lin_slope, color="red")
-
-    quant_regression = QuantileRegressor(quantile=0.9, alpha=0).fit(x.reshape(-1, 1), y)
-    quant_slope = quant_regression.coef_[0]
-    quant_intercept = quant_regression.intercept_
-    plt.axline(
-        (x[0], x[0] * quant_slope + quant_intercept),
-        slope=quant_slope,
-        color="green",
-    )
-    plt.show()
 
     x = 1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"]
-    y = dataframe["IHOP Acc"]
-    x_pred = np.arange(x.min(), x.max(), (x.max() - x.min()) / 500)
-    y_lin = posit(lin_slope * np.log(x_pred) + lin_intercept)
-    y_quant = posit(quant_slope * np.log(x_pred) + quant_intercept)
-    plt.scatter(x, y)
-    plt.plot(x_pred, y_lin, color="red")
-    plt.plot(x_pred, y_quant, color="green")
+    y = dataframe[col_name]
+    step_size = x.max() / 500
+    x_pred = np.arange(step_size, x.max(), step_size)
+
+    # Compute the predictions
+    log_y_lin = lin_slope * np.log(x_pred) + lin_intercept
+    y_lin = posit(log_y_lin)
+
+    quant095_slope, quant095_intercept = data_to_quant_reg(dataframe, col_name)
+    log_y_quant095 = quant095_slope * np.log(x_pred) + quant095_intercept
+    y_quant095 = posit(log_y_quant095)
+
+    quant075_slope, quant075_intercept = data_to_quant_reg(dataframe, col_name, 0.75)
+    log_y_quant075 = quant075_slope * np.log(x_pred) + quant075_intercept
+    y_quant075 = posit(log_y_quant075)
+
+    # Visualization in  the log-log space
+    ax.scatter(log_x, log_y, color="black", alpha=0.5, label="Observations")
+    ax.plot(np.log(x_pred), log_y_lin, label="Linear")
+    ax.plot(np.log(x_pred), log_y_quant075, label="Quantile 0.75")
+    ax.plot(np.log(x_pred), log_y_quant095, label="Quantile 0.95")
+    ax.set(
+        xlabel=r"$\log(\frac{1}{n_\mathrm{atk}}+\frac{1}{n_\mathrm{ind}})$",
+        ylabel=r"$\mathrm{logit}(\mathrm{Accuracy})$",
+    )
+    ax.set_xlim((log_x.min() - 0.1, log_x.max() + 0.1))
+    ax.set_ylim((log_y.min() - 0.1, log_y.max() + 0.1))
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(f"risk_assess_{(col_name.replace(' ','_'))}_log.png", dpi=400)
+    plt.cla()
+
+    # Visualization in  the standard space
+    ax.scatter(x, y, color="black", alpha=0.5, label="Observations")
+    ax.plot(x_pred, y_lin, label="Linear")
+    ax.plot(x_pred, y_quant075, label="Quantile 0.75")
+    ax.plot(x_pred, y_quant095, label="Quantile 0.95")
+    ax.set(
+        xlabel=r"$\frac{1}{n_\mathrm{atk}}+\frac{1}{n_\mathrm{ind}}$",
+        ylabel="Accuracy",
+    )
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(f"risk_assess_{(col_name.replace(' ','_'))}.png", dpi=400)
+
+
+def fig_comp_risk_assessment():
+    fig, ax = plt.subplots()
+    dataframe = pd.read_csv("risk_assessment.csv")
     # Score+RefinedScore+IHOP risk assessment
+    x = 1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"]
+    step_size = x.max() / 500
+    x_pred = np.arange(step_size, x.max(), step_size)
+
+    ihop_quant_slope, ihop_quant_intercept = data_to_quant_reg(dataframe, "IHOP Acc")
+    y_quant_ihop = posit(ihop_quant_slope * np.log(x_pred) + ihop_quant_intercept)
+    ref_quant_slope, ref_quant_intercept = data_to_quant_reg(
+        dataframe, "Refined Score Acc"
+    )
+    score_quant_slope, score_quant_intercept = data_to_quant_reg(dataframe, "Score Acc")
+    y_quant_ref = posit(ref_quant_slope * np.log(x_pred) + ref_quant_intercept)
+    y_quant_score = posit(score_quant_slope * np.log(x_pred) + score_quant_intercept)
+    ax.plot(x_pred, y_quant_ihop, label="IHOP")
+    ax.plot(x_pred, y_quant_ref, label="Refined Score")
+    ax.plot(x_pred, y_quant_score, label="Score")
+    ax.legend()
+    ax.set(
+        xlabel=r"$\frac{1}{n_\mathrm{atk}}+\frac{1}{n_\mathrm{ind}}$",
+        ylabel="Accuracy",
+    )
+    fig.tight_layout()
+    fig.savefig("risk_assess_comparison.png", dpi=400)
 
 
 if __name__ == "__main__":
@@ -120,4 +199,8 @@ if __name__ == "__main__":
     os.chdir("results")
 
     # Call all functions defined in this file
-    fig_subsec_4C(False)
+    # fig_epsilon_nb_docs()
+    fig_indiv_risk_assessment("IHOP Acc")
+    fig_indiv_risk_assessment("Refined Score Acc")
+    fig_indiv_risk_assessment("Score Acc")
+    fig_comp_risk_assessment()
