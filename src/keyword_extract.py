@@ -1,8 +1,6 @@
-import logging
 import multiprocessing
 
 from functools import reduce
-from contextlib import contextmanager
 from collections import Counter
 from typing import List, Dict
 
@@ -16,40 +14,12 @@ from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 from nltk.tokenize import sent_tokenize, word_tokenize
 
+from .simulation_utils import poolcontext
+
 nltk.download("stopwords")
 nltk.download("punkt")
 
 logger = colorlog.getLogger("RaaC paper")
-
-
-def setup_logger():
-    logger.handlers = []  # Reset handlers
-    handler = colorlog.StreamHandler()
-    handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(log_color)s[%(asctime)s %(levelname)s]%(reset)s %(module)s: "
-            "%(white)s%(message)s",
-            datefmt="%H:%M:%S",
-            reset=True,
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "green",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "red",
-            },
-        )
-    )
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-
-
-@contextmanager
-def poolcontext(*args, **kwargs):
-    """Context manager to standardize the parallelized functions."""
-    pool = multiprocessing.Pool(*args, **kwargs)
-    yield pool
-    pool.terminate()
 
 
 class OccRowComputer:

@@ -1,5 +1,9 @@
+import logging
+import math
+import multiprocessing
 import random
 
+from contextlib import contextmanager
 from datetime import datetime
 from typing import List, Dict, Tuple
 
@@ -8,6 +12,36 @@ import numpy as np
 
 
 logger = colorlog.getLogger("RaaC paper")
+
+
+def setup_logger():
+    logger.handlers = []  # Reset handlers
+    handler = colorlog.StreamHandler()
+    handler.setFormatter(
+        colorlog.ColoredFormatter(
+            "%(log_color)s[%(asctime)s %(levelname)s]%(reset)s %(module)s: "
+            "%(white)s%(message)s",
+            datefmt="%H:%M:%S",
+            reset=True,
+            log_colors={
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "red",
+            },
+        )
+    )
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+
+@contextmanager
+def poolcontext(*args, **kwargs):
+    """Context manager to standardize the parallelized functions."""
+    pool = multiprocessing.Pool(*args, **kwargs)
+    yield pool
+    pool.terminate()
 
 
 def generate_known_queries(
@@ -112,3 +146,36 @@ def simulate_attack(attack_class, **kwargs) -> Tuple[float, float]:
     acc = np.mean([word == candidate for word, candidate in pred.items()])
     runtime = (end - start).total_seconds()
     return acc, runtime
+
+
+def padding_countermeasure(input_array, padding_threshold=500):
+    """Adds an access pattern padding to an index matrix.
+    The "padding threshold" defines the number n such as all the keywords have an occurence divisible by n.
+    The algorithms creates random entries to meet this requirement.
+    Extremely simple mitigation but not optimized.
+
+    Ref: D.Cash, P.Grubbs, J.Perry and T. Ristenpart. Leakage-abuse attacks against searchable encryption. 2015
+    """
+    occ_array = input_array.copy()
+    _, ncol = occ_array.shape
+    number_real_entries = np.sum(occ_array)
+    for j in range(ncol):
+        nb_entries = sum(occ_array[:, j])
+        nb_fake_entries_to_add = int(
+            math.ceil(nb_entries / padding_threshold) * padding_threshold - nb_entries
+        )
+        possible_fake_entries = list(np.argwhere(occ_array[:, j] == 0).flatten())
+        if len(possible_fake_entries) < nb_fake_entries_to_add:
+            # We need more documents to generate enough fake entries
+            # So we generate fake document IDs
+            fake_documents = np.zeros(
+                (nb_fake_entries_to_add - len(possible_fake_entries), ncol)
+            )
+            occ_array = np.concatenate((occ_array, fake_documents))
+            possible_fake_entries = list(np.argwhere(occ_array[:, j] == 0).flatten())
+        fake_entries = random.sample(possible_fake_entries, nb_fake_entries_to_add)
+        occ_array[fake_entries, j] = 1
+
+    number_observed_entries = np.sum(occ_array)
+    overhead = number_observed_entries / number_real_entries
+    return occ_array, overhead

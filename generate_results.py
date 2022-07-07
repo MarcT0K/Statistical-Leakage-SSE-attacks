@@ -10,6 +10,7 @@ from src.simulation_utils import (
     generate_adv_knowledge_fixed_nb_docs,
     simulate_attack,
     generate_adv_knowledge,
+    padding_countermeasure,
 )
 from src.email_extraction import enron_extractor, apache_extractor, blogs_extractor
 from src.attacks.score import RefinedScoreAttacker, ScoreAttacker
@@ -355,7 +356,9 @@ def risk_assessment_truncated_vocabulary():
     min_sum = 2 / (n_docs * 0.5)
     max_sum = 2 / min_docs
 
-    with open("risk_assessment.csv", "w", newline="", encoding="utf-8") as csvfile:
+    with open(
+        "risk_assessment_truncated_voc.csv", "w", newline="", encoding="utf-8"
+    ) as csvfile:
         fieldnames = [
             "Nb similar docs",
             "Nb server docs",
@@ -410,6 +413,142 @@ def risk_assessment_truncated_vocabulary():
                     "Nb queries known": len(known_queries),
                     "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
                     "Refined Score Acc": ref_acc,
+                }
+            )
+
+
+def risk_assessment_countermeasure_tuning():
+    extractor = enron_extractor(VOC_SIZE)
+    occ_mat = extractor.occ_array
+
+    n_docs = occ_mat.shape[0]
+    min_docs = 500
+    assert n_docs > min_docs
+
+    # Sum = 1/n_atk + 1/n_ind but we consider n_atk = n_ind for simplicity => Sum = 2/n_atk
+    min_sum = 2 / (n_docs * 0.5)
+    max_sum = 2 / min_docs
+
+    with open(
+        "risk_assessment_countermeasure.csv", "w", newline="", encoding="utf-8"
+    ) as csvfile:
+        fieldnames = [
+            "Nb similar docs",
+            "Nb server docs",
+            "Voc size",
+            "Nb queries observed",
+            "Nb queries known",
+            "Epsilon",
+            "Baseline accuracy",
+            "Accuracy with padding parameter 50",
+            "Overhead with padding parameter 50",
+            "Accuracy with padding parameter 100",
+            "Overhead with padding parameter 100",
+            "Accuracy with padding parameter 200",
+            "Overhead with padding parameter 200",
+            "Accuracy with padding parameter 500",
+            "Overhead with padding parameter 500",
+        ]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for i in tqdm.tqdm(
+            iterable=[i for i in range(51) for k in range(1)],
+            desc="Running the experiments",
+        ):
+            curr_sum = (max_sum - min_sum) * (i * 2) / 100 + min_sum
+            curr_n = int(2 / curr_sum)
+            # Auxiliary knowledge generation
+            voc = list(extractor.get_sorted_voc())
+            (
+                ind_mat,
+                atk_mat,
+                queries,
+                queries_ind,  # Even if we observe all queries, we want their order
+                known_queries,
+            ) = generate_adv_knowledge_fixed_nb_docs(
+                occ_mat, curr_n, curr_n, voc, VOC_SIZE, KNOWN_QUERIES
+            )
+
+            # Padding param 50
+            mitigated_mat, overhead_50 = padding_countermeasure(ind_mat, 50)
+            ref_acc_50, _runtime = simulate_attack(
+                RefinedScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=mitigated_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # Padding param 100
+            mitigated_mat, overhead_100 = padding_countermeasure(ind_mat, 100)
+            ref_acc_100, _runtime = simulate_attack(
+                RefinedScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=mitigated_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # Padding param 100
+            mitigated_mat, overhead_200 = padding_countermeasure(ind_mat, 200)
+            ref_acc_200, _runtime = simulate_attack(
+                RefinedScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=mitigated_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # Padding param 500
+            mitigated_mat, overhead_500 = padding_countermeasure(ind_mat, 500)
+            ref_acc_500, _runtime = simulate_attack(
+                RefinedScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=mitigated_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # Nothing
+            ref_acc_nothing, _runtime = simulate_attack(
+                RefinedScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=ind_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # Compute espilon-similarity
+            ind_doc_coocc = ind_mat.T @ ind_mat / ind_mat.shape[0]
+            atk_full_coocc = atk_mat.T @ atk_mat / atk_mat.shape[0]
+
+            writer.writerow(
+                {
+                    "Nb similar docs": atk_mat.shape[0],
+                    "Nb server docs": ind_mat.shape[0],
+                    "Voc size": len(voc),
+                    "Nb queries observed": len(queries),
+                    "Nb queries known": len(known_queries),
+                    "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
+                    "Baseline accuracy": ref_acc_nothing,
+                    "Accuracy with padding parameter 50": overhead_50,
+                    "Overhead with padding parameter 50": ref_acc_50,
+                    "Accuracy with padding parameter 100": overhead_100,
+                    "Overhead with padding parameter 100": ref_acc_100,
+                    "Accuracy with padding parameter 200": overhead_200,
+                    "Overhead with padding parameter 200": ref_acc_200,
+                    "Accuracy with padding parameter 500": overhead_500,
+                    "Overhead with padding parameter 500": ref_acc_500,
                 }
             )
 
