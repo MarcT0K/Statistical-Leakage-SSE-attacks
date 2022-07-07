@@ -343,6 +343,77 @@ def risk_assessment():
             )
 
 
+def risk_assessment_truncated_vocabulary():
+    extractor = enron_extractor(VOC_SIZE)
+    occ_mat = extractor.occ_array
+
+    n_docs = occ_mat.shape[0]
+    min_docs = 500
+    assert n_docs > min_docs
+
+    # Sum = 1/n_atk + 1/n_ind but we consider n_atk = n_ind for simplicity => Sum = 2/n_atk
+    min_sum = 2 / (n_docs * 0.5)
+    max_sum = 2 / min_docs
+
+    with open("risk_assessment.csv", "w", newline="", encoding="utf-8") as csvfile:
+        fieldnames = [
+            "Nb similar docs",
+            "Nb server docs",
+            "Voc size",
+            "Nb queries observed",
+            "Nb queries known",
+            "Epsilon",
+            "Refined Score Acc",
+        ]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for i in tqdm.tqdm(
+            iterable=[i for i in range(51) for k in range(1)],
+            desc="Running the experiments",
+        ):
+            curr_sum = (max_sum - min_sum) * (i * 2) / 100 + min_sum
+            curr_n = int(2 / curr_sum)
+            # Auxiliary knowledge generation
+            trunc_occ_mat = occ_mat[100:, :]
+            voc = list(extractor.get_sorted_voc())[100:]
+            (
+                ind_mat,
+                atk_mat,
+                queries,
+                queries_ind,  # Even if we observe all queries, we want their order
+                known_queries,
+            ) = generate_adv_knowledge_fixed_nb_docs(
+                trunc_occ_mat, curr_n, curr_n, voc, VOC_SIZE, KNOWN_QUERIES
+            )
+
+            # Refined score attack
+            ref_acc, _runtime = simulate_attack(
+                RefinedScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=ind_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # Compute espilon-similarity
+            ind_doc_coocc = ind_mat.T @ ind_mat / ind_mat.shape[0]
+            atk_full_coocc = atk_mat.T @ atk_mat / atk_mat.shape[0]
+
+            writer.writerow(
+                {
+                    "Nb similar docs": atk_mat.shape[0],
+                    "Nb server docs": ind_mat.shape[0],
+                    "Voc size": len(voc),
+                    "Nb queries observed": len(queries),
+                    "Nb queries known": len(known_queries),
+                    "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
+                    "Refined Score Acc": ref_acc,
+                }
+            )
+
+
 # TODO: add a bit of logging?
 if __name__ == "__main__":
     if not os.path.exists("results"):
