@@ -386,7 +386,7 @@ def risk_assessment_truncated_vocabulary():
                 queries_ind,  # Even if we observe all queries, we want their order
                 known_queries,
             ) = generate_adv_knowledge_fixed_nb_docs(
-                trunc_occ_mat, curr_n, curr_n, voc, VOC_SIZE, KNOWN_QUERIES
+                trunc_occ_mat, curr_n, curr_n, voc, VOC_SIZE - 100, KNOWN_QUERIES
             )
 
             # Refined score attack
