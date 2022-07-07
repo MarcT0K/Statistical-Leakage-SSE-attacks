@@ -377,7 +377,7 @@ def risk_assessment_truncated_vocabulary():
             curr_sum = (max_sum - min_sum) * (i * 2) / 100 + min_sum
             curr_n = int(2 / curr_sum)
             # Auxiliary knowledge generation
-            trunc_occ_mat = occ_mat[100:, :]
+            trunc_occ_mat = occ_mat[:, 100:]
             voc = list(extractor.get_sorted_voc())[100:]
             (
                 ind_mat,
