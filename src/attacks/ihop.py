@@ -3,7 +3,7 @@ from typing import List
 import numpy as np
 from scipy.optimize import linear_sum_assignment as hungarian
 
-from .utils import compute_log_binomial_probability_matrix, KeywordAttacker
+from .utils import KeywordAttacker, compute_log_binomial_probability_matrix
 
 
 class IHOPAttacker(KeywordAttacker):

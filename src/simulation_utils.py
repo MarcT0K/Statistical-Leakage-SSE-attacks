@@ -2,14 +2,12 @@ import logging
 import math
 import multiprocessing
 import random
-
 from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Dict, Tuple
+from typing import Dict, List, Tuple
 
 import colorlog
 import numpy as np
-
 
 logger = colorlog.getLogger("RaaC paper")
 

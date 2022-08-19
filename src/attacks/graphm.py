@@ -1,11 +1,11 @@
 import os
-import subprocess
-import stat
 import shutil
-
+import stat
+import subprocess
 from typing import List
-from .utils import KeywordAttacker, compute_log_binomial_probability_matrix
+
 from ..conf import GRAPHM_PATH
+from .utils import KeywordAttacker, compute_log_binomial_probability_matrix
 
 
 class GraphMatchingAttacker(KeywordAttacker):

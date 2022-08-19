@@ -23,5 +23,7 @@ for y in {2002..2011}; do
 done
 
 # Blogs
-# TODO
+https://web.archive.org/web/20200121222642/http://u.cs.biu.ac.il/~koppel/blogs/blogs.zip
+unzip blogs.zip
+rm blogs.zip
 

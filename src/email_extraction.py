@@ -5,13 +5,12 @@ import email
 import functools
 import glob
 import mailbox
-import pickle
 import os
+import pickle
 
 import colorlog
 import pandas as pd
 import tqdm
-
 from bs4 import BeautifulSoup
 
 from .keyword_extract import KeywordExtractor

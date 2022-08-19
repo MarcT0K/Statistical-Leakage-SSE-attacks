@@ -2,27 +2,24 @@
 # pylint: disable=invalid-name
 import csv
 import os
+import random
 
 import numpy as np
 import tqdm
 
-from src.simulation_utils import (
-    generate_adv_knowledge_fixed_nb_docs,
-    simulate_attack,
-    generate_adv_knowledge,
-    padding_countermeasure,
-)
-from src.email_extraction import enron_extractor, apache_extractor, blogs_extractor
-from src.attacks.score import RefinedScoreAttacker, ScoreAttacker
 from src.attacks.ihop import IHOPAttacker
+from src.attacks.score import RefinedScoreAttacker, ScoreAttacker
+from src.email_extraction import (apache_extractor, blogs_extractor,
+                                  enron_extractor)
+from src.simulation_utils import (generate_adv_knowledge,
+                                  generate_adv_knowledge_fixed_nb_docs,
+                                  padding_countermeasure, simulate_attack)
 
 epsilon_sim = lambda coocc_1, coocc_2: np.linalg.norm(coocc_1 - coocc_2)
 
 VOC_SIZE = 500
 QUERYSET_SIZE = 300
 KNOWN_QUERIES = 15
-
-# TODO: fix the random seeds
 
 
 def similarity_exploration():
@@ -82,11 +79,19 @@ def similarity_exploration():
                 )
 
 
-def atk_comparison():
+def atk_comparison(queryset_size=QUERYSET_SIZE, result_file="atk_comparison.csv"):
     extractor = enron_extractor(VOC_SIZE)
     occ_mat = extractor.occ_array
 
-    with open("atk_comparison.csv", "w", newline="", encoding="utf-8") as csvfile:
+    n_docs = occ_mat.shape[0]
+    min_docs = 500
+    assert n_docs > min_docs
+
+    # Sum = 1/n_atk + 1/n_ind but we consider n_atk = n_ind for simplicity => Sum = 2/n_atk
+    min_sum = 2 / (n_docs * 0.5)
+    max_sum = 2 / min_docs
+
+    with open(result_file, "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = [
             "Nb similar docs",
             "Nb server docs",
@@ -103,12 +108,12 @@ def atk_comparison():
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        for i, j in tqdm.tqdm(
-            iterable=[
-                (i, j) for i in range(1, 11) for j in range(1, 11) for k in range(5)
-            ],
+        for i in tqdm.tqdm(
+            iterable=[i for i in range(200)],
             desc="Running the experiments",
         ):
+            curr_sum = (max_sum - min_sum) * (i * 2) / 100 + min_sum
+            curr_n = int(2 / curr_sum)
             # Auxiliary knowledge generation
             voc = list(extractor.get_sorted_voc())
             (
@@ -118,7 +123,7 @@ def atk_comparison():
                 queries_ind,
                 known_queries,
             ) = generate_adv_knowledge(
-                occ_mat, i * 0.05, j * 0.05, voc, QUERYSET_SIZE, KNOWN_QUERIES
+                occ_mat, curr_n, curr_n, voc, queryset_size, KNOWN_QUERIES
             )
 
             # Score attack
@@ -249,99 +254,7 @@ def generate_ref_score_results(extractor_function, dataset_name, truncation_size
 
 
 def risk_assessment():
-    extractor = enron_extractor(VOC_SIZE)
-    occ_mat = extractor.occ_array
-
-    n_docs = occ_mat.shape[0]
-    min_docs = 500
-    assert n_docs > min_docs
-
-    # Sum = 1/n_atk + 1/n_ind but we consider n_atk = n_ind for simplicity => Sum = 2/n_atk
-    min_sum = 2 / (n_docs * 0.5)
-    max_sum = 2 / min_docs
-
-    with open("risk_assessment.csv", "w", newline="", encoding="utf-8") as csvfile:
-        fieldnames = [
-            "Nb similar docs",
-            "Nb server docs",
-            "Voc size",
-            "Nb queries observed",
-            "Nb queries known",
-            "Epsilon",
-            "Score Acc",
-            "Refined Score Acc",
-            "IHOP Acc",
-        ]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        for i in tqdm.tqdm(
-            iterable=[i for i in range(51) for k in range(1)],
-            desc="Running the experiments",
-        ):
-            curr_sum = (max_sum - min_sum) * (i * 2) / 100 + min_sum
-            curr_n = int(2 / curr_sum)
-            # Auxiliary knowledge generation
-            voc = list(extractor.get_sorted_voc())
-            (
-                ind_mat,
-                atk_mat,
-                queries,
-                queries_ind,  # Even if we observe all queries, we want their order
-                known_queries,
-            ) = generate_adv_knowledge_fixed_nb_docs(
-                occ_mat, curr_n, curr_n, voc, VOC_SIZE, KNOWN_QUERIES
-            )
-
-            # Score attack
-            score_acc, _runtime = simulate_attack(
-                ScoreAttacker,
-                keyword_occ_array=atk_mat,
-                keyword_sorted_voc=voc,
-                trapdoor_occ_array=ind_mat[:, queries_ind],
-                trapdoor_sorted_voc=queries,
-                nb_stored_docs=ind_mat.shape[0],
-                known_queries=known_queries,
-            )
-
-            # Refined score attack
-            ref_acc, _runtime = simulate_attack(
-                RefinedScoreAttacker,
-                keyword_occ_array=atk_mat,
-                keyword_sorted_voc=voc,
-                trapdoor_occ_array=ind_mat[:, queries_ind],
-                trapdoor_sorted_voc=queries,
-                nb_stored_docs=ind_mat.shape[0],
-                known_queries=known_queries,
-            )
-
-            # IHOP attack
-            ihop_acc, _runtime = simulate_attack(
-                IHOPAttacker,
-                keyword_occ_array=atk_mat,
-                keyword_sorted_voc=voc,
-                trapdoor_occ_array=ind_mat[:, queries_ind],
-                trapdoor_sorted_voc=queries,
-                nb_stored_docs=ind_mat.shape[0],
-                known_queries=known_queries,
-            )
-
-            # Compute espilon-similarity
-            ind_doc_coocc = ind_mat.T @ ind_mat / ind_mat.shape[0]
-            atk_full_coocc = atk_mat.T @ atk_mat / atk_mat.shape[0]
-
-            writer.writerow(
-                {
-                    "Nb similar docs": atk_mat.shape[0],
-                    "Nb server docs": ind_mat.shape[0],
-                    "Voc size": len(voc),
-                    "Nb queries observed": len(queries),
-                    "Nb queries known": len(known_queries),
-                    "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
-                    "Score Acc": score_acc,
-                    "Refined Score Acc": ref_acc,
-                    "IHOP Acc": ihop_acc,
-                }
-            )
+    atk_comparison(VOC_SIZE, "risk_assessment.csv")
 
 
 def risk_assessment_truncated_vocabulary():
@@ -371,7 +284,7 @@ def risk_assessment_truncated_vocabulary():
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for i in tqdm.tqdm(
-            iterable=[i for i in range(51) for k in range(1)],
+            iterable=[i for i in range(51)],
             desc="Running the experiments",
         ):
             curr_sum = (max_sum - min_sum) * (i * 2) / 100 + min_sum
@@ -452,7 +365,7 @@ def risk_assessment_countermeasure_tuning():
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for i in tqdm.tqdm(
-            iterable=[i for i in range(51) for k in range(1)],
+            iterable=[i for i in range(51)],
             desc="Running the experiments",
         ):
             curr_sum = (max_sum - min_sum) * (i * 2) / 100 + min_sum
@@ -553,6 +466,18 @@ def risk_assessment_countermeasure_tuning():
             )
 
 
+def fix_randomness(seed: int):
+    """Fix the random seeds of numpy and random.
+
+    This method is called before each experiment so the experiments can be executed individually.
+
+    Args:
+        seed (int): random seed
+    """
+    np.random.seed(seed)
+    random.seed(seed)
+
+
 # TODO: add a bit of logging?
 if __name__ == "__main__":
     if not os.path.exists("results"):
@@ -560,10 +485,23 @@ if __name__ == "__main__":
     os.chdir("results")
 
     # Call all functions defined in this file
+    fix_randomness(42)
     similarity_exploration()
+    fix_randomness(43)
     atk_comparison()
+    fix_randomness(44)
+    generate_ref_score_results(enron_extractor, "enron")
+    fix_randomness(45)
     generate_ref_score_results(apache_extractor, "apache")
+    fix_randomness(46)
     generate_ref_score_results(apache_extractor, "apache_reduced", 30000)
+    fix_randomness(47)
     generate_ref_score_results(blogs_extractor, "blogs")
+    fix_randomness(48)
     generate_ref_score_results(blogs_extractor, "blogs_reduced", 30000)
+    fix_randomness(49)
     risk_assessment()
+    fix_randomness(50)
+    risk_assessment_countermeasure_tuning()
+    fix_randomness(51)
+    risk_assessment_truncated_vocabulary()

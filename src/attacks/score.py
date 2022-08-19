@@ -1,13 +1,12 @@
 import multiprocessing
-
 from functools import reduce
 from typing import Dict, List, Tuple
 
 import colorlog
 import numpy as np
 
-from .utils import KeywordAttacker
 from ..keyword_extract import poolcontext
+from .utils import KeywordAttacker
 
 logger = colorlog.getLogger("RaaC paper")
 

@@ -1,15 +1,13 @@
 import multiprocessing
-
-from functools import reduce
 from collections import Counter
-from typing import List, Dict
+from functools import reduce
+from typing import Dict, List
 
 import colorlog
 import nltk
 import numpy as np
 import pandas as pd
 import tqdm
-
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 from nltk.tokenize import sent_tokenize, word_tokenize
