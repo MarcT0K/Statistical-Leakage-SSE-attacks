@@ -89,8 +89,8 @@ def data_to_xy(dataframe, col_name):
     x = np.log(1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"])
     y = logit(dataframe[col_name])
 
-    mask = y != np.inf
-    assert sum(~mask) < 10  # To avoid removing too many points
+    mask = abs(y) != np.inf
+    assert sum(~mask) < 1 / 3 * y.shape[0]  # To avoid removing too many points
 
     y = y[mask].to_numpy()
     x = x[mask].to_numpy()
@@ -191,6 +191,120 @@ def fig_comp_risk_assessment():
     )
     fig.tight_layout()
     fig.savefig("risk_assess_comparison.png", dpi=400)
+
+
+def fig_comp_countermeasure_tuning():
+    fig, ax = plt.subplots()
+    dataframe = pd.read_csv("risk_assessment_countermeasure.csv")
+
+    x = 1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"]
+    step_size = x.max() / 500
+    x_pred = np.arange(step_size, x.max(), step_size)
+
+    def generate_y(colname):
+        slope, intercept = data_to_quant_reg(dataframe, colname)
+        return posit(slope * np.log(x_pred) + intercept)
+
+    y_baseline = generate_y("Baseline accuracy")
+    y_padding_50 = generate_y("Accuracy with padding parameter 50")
+    y_padding_100 = generate_y("Accuracy with padding parameter 100")
+    y_padding_200 = generate_y("Accuracy with padding parameter 200")
+    y_padding_500 = generate_y("Accuracy with padding parameter 500")
+
+    ax.plot(x_pred, y_baseline, label="Baseline")
+    ax.plot(x_pred, y_padding_50, label="Padding threshold = 50")
+    ax.plot(x_pred, y_padding_100, label="Padding threshold = 100")
+    ax.plot(x_pred, y_padding_200, label="Padding threshold = 200")
+    ax.plot(x_pred, y_padding_500, label="Padding threshold = 500")
+    ax.legend()
+    ax.set(
+        xlabel=r"$\frac{1}{n_\mathrm{atk}}+\frac{1}{n_\mathrm{ind}}$",
+        ylabel="Accuracy",
+    )
+    fig.tight_layout()
+    fig.savefig("parameter_countermeasure_comparison.png", dpi=400)
+
+
+def fig_comp_parameter_tuning():
+    fig, ax = plt.subplots()
+    dataframe_classic = pd.read_csv("risk_assessment.csv")
+    dataframe_truncated = pd.read_csv("risk_assessment_truncated_voc.csv")
+
+    assert (
+        dataframe_classic["Nb server docs"] == dataframe_truncated["Nb server docs"]
+    ).all() and (
+        dataframe_classic["Nb similar docs"] == dataframe_truncated["Nb similar docs"]
+    ).all()
+    x = (
+        1 / dataframe_classic["Nb server docs"]
+        + 1 / dataframe_classic["Nb similar docs"]
+    )
+    step_size = x.max() / 500
+    x_pred = np.arange(step_size, x.max(), step_size)
+
+    classic_slope, classic_intercept = data_to_quant_reg(
+        dataframe_classic, "Refined Score Acc"
+    )
+    y_classic = posit(classic_slope * np.log(x_pred) + classic_intercept)
+    truncated_slope, truncated_intercept = data_to_quant_reg(
+        dataframe_truncated, "Refined Score Acc"
+    )
+    y_truncated = posit(truncated_slope * np.log(x_pred) + truncated_intercept)
+    ax.plot(x_pred, y_classic, label="Baseline")
+    ax.plot(x_pred, y_truncated, label="Truncated vocabulary")
+    ax.legend()
+    ax.set(
+        xlabel=r"$\frac{1}{n_\mathrm{atk}}+\frac{1}{n_\mathrm{ind}}$",
+        ylabel="Accuracy",
+    )
+    fig.tight_layout()
+    fig.savefig("parameter_tuning_comparison.png", dpi=400)
+
+
+def lambda_risk_acc_to_document_size(col_name, n_atk_max=None):
+    dataframe = pd.read_csv("risk_assessment.csv")
+
+    # Compute the prediction
+    quant095_slope, quant095_intercept = data_to_quant_reg(dataframe, col_name)
+
+    # Remainder logit(acc) = b * log(1/natk + 1/nind) + a
+    if n_atk_max is None:
+        func = lambda acc_threshold: 1 / np.exp(
+            (logit(acc_threshold) - quant095_intercept) / quant095_slope
+        )
+    else:
+        func = lambda acc_threshold: 1 / (
+            np.exp((logit(acc_threshold) - quant095_intercept) / quant095_slope)
+            - 1 / n_atk_max
+        )
+    return func
+
+
+def tab_risk_assess_conclusions():
+    risk_inversion_func = lambda_risk_acc_to_document_size("IHOP Acc")
+    risk_inversion_func_fixed_atk_200 = lambda_risk_acc_to_document_size(
+        "IHOP Acc", 200
+    )
+    risk_inversion_func_fixed_atk_500 = lambda_risk_acc_to_document_size(
+        "IHOP Acc", 500
+    )
+    risk_inversion_func_fixed_atk_1000 = lambda_risk_acc_to_document_size(
+        "IHOP Acc", 1000
+    )
+
+    res = []
+    for acc in [0.05, 0.1, 0.2, 0.5]:
+        res.append(
+            (
+                risk_inversion_func_fixed_atk_200(acc),
+                risk_inversion_func_fixed_atk_500(acc),
+                risk_inversion_func_fixed_atk_1000(acc),
+                risk_inversion_func(acc),
+            )
+        )
+    res = np.floor(np.array(res).T)
+    res[res <= 0] = np.inf
+    return res
 
 
 if __name__ == "__main__":

@@ -541,14 +541,14 @@ def risk_assessment_countermeasure_tuning():
                     "Nb queries known": len(known_queries),
                     "Epsilon": epsilon_sim(atk_full_coocc, ind_doc_coocc),
                     "Baseline accuracy": ref_acc_nothing,
-                    "Accuracy with padding parameter 50": overhead_50,
-                    "Overhead with padding parameter 50": ref_acc_50,
-                    "Accuracy with padding parameter 100": overhead_100,
-                    "Overhead with padding parameter 100": ref_acc_100,
-                    "Accuracy with padding parameter 200": overhead_200,
-                    "Overhead with padding parameter 200": ref_acc_200,
-                    "Accuracy with padding parameter 500": overhead_500,
-                    "Overhead with padding parameter 500": ref_acc_500,
+                    "Accuracy with padding parameter 50": ref_acc_50,
+                    "Overhead with padding parameter 50": overhead_50,
+                    "Accuracy with padding parameter 100": ref_acc_100,
+                    "Overhead with padding parameter 100": overhead_100,
+                    "Accuracy with padding parameter 200": ref_acc_200,
+                    "Overhead with padding parameter 200": overhead_200,
+                    "Accuracy with padding parameter 500": ref_acc_500,
+                    "Overhead with padding parameter 500": overhead_500,
                 }
             )
 
