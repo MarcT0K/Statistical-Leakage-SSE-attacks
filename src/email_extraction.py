@@ -131,7 +131,3 @@ enron_extractor = functools.partial(
 apache_extractor = functools.partial(generic_extractor, extract_apache_ml, "apache")
 
 blogs_extractor = functools.partial(generic_extractor, extract_blogs, "blogs")
-
-apache_by_year_extractor = functools.partial(
-    generic_extractor, extract_apache_ml_by_year, "apache_by_year"
-)

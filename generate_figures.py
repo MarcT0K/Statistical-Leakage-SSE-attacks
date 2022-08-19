@@ -33,7 +33,7 @@ plt.rcParams.update(params)
 
 
 def fig_epsilon_nb_docs():
-    with open("fig_subsec_4C.csv", "r", encoding="utf-8") as csvfile:
+    with open("similarity_exploration.csv", "r", encoding="utf-8") as csvfile:
         csvfile.readline()
         arr = np.loadtxt(csvfile, delimiter=",")
 
@@ -104,6 +104,67 @@ def data_to_quant_reg(dataframe, col_name, quantile=QUANTILE):
     slope = quant_regression.coef_[0]
     intercept = quant_regression.intercept_
     return slope, intercept
+
+
+def fig_attack_analysis(dataset_name):
+    fig, ax = plt.subplots()
+    dataframe = pd.read_csv(f"{dataset_name}_results.csv")
+
+    x = dataframe["Epsilon"]
+    y = dataframe["Refined Score Acc"]
+    log_x = np.array(np.log(x))
+    log_y = np.array(logit(y))
+
+    linear_regression = LinearRegression().fit(
+        log_x.reshape(-1, 1), log_y.reshape(-1, 1)
+    )
+    lin_slope = linear_regression.coef_[0, 0]
+    lin_intercept = linear_regression.intercept_[0]
+
+    step_size = x.max() / 500
+    x_pred = np.arange(step_size, x.max(), step_size)
+
+    # Compute the predictions
+    log_y_lin = lin_slope * np.log(x_pred) + lin_intercept
+    y_lin = posit(log_y_lin)
+
+    # Visualization in  the logit space
+    ax.scatter(x, log_y, color="black", alpha=0.5, label="Observations")
+    ax.set(
+        xlabel=r"$\epsilon$-similarity",
+        ylabel=r"$\mathrm{logit}(\mathrm{Accuracy})$",
+    )
+
+    ax.set_ylim((log_y.min() - 0.1, log_y.max() + 0.1))
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(f"atk_analysis_{dataset_name}_logit.png", dpi=400)
+    plt.cla()
+
+    # Visualization in  the logit-log space
+    ax.scatter(log_x, log_y, color="black", alpha=0.5, label="Observations")
+    ax.plot(np.log(x_pred), log_y_lin, label="Linear")
+    ax.set(
+        xlabel=r"$\log(\epsilon$-similarity$)$",
+        ylabel=r"$\mathrm{logit}(\mathrm{Accuracy})$",
+    )
+    ax.set_xlim((log_x.min() - 0.1, log_x.max() + 0.1))
+    ax.set_ylim((log_y.min() - 0.1, log_y.max() + 0.1))
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(f"atk_analysis_{dataset_name}_logit-log.png", dpi=400)
+    plt.cla()
+
+    # Visualization in  the standard space
+    ax.scatter(x, y, color="black", alpha=0.5, label="Observations")
+    ax.plot(x_pred, y_lin, label="Linear")
+    ax.set(
+        xlabel=r"$\epsilon$-similarity",
+        ylabel="Accuracy",
+    )
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(f"atk_analysis_{dataset_name}.png", dpi=400)
 
 
 def fig_indiv_risk_assessment(col_name):
@@ -313,6 +374,11 @@ if __name__ == "__main__":
 
     # Call all functions defined in this file
     # fig_epsilon_nb_docs()
+
+    fig_attack_analysis("enron")
+    fig_attack_analysis("apache")
+    # fig_attack_analysis("bloggers")
+
     fig_indiv_risk_assessment("IHOP Acc")
     fig_indiv_risk_assessment("Refined Score Acc")
     fig_indiv_risk_assessment("Score Acc")
