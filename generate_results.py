@@ -9,11 +9,13 @@ import tqdm
 
 from src.attacks.ihop import IHOPAttacker
 from src.attacks.score import RefinedScoreAttacker, ScoreAttacker
-from src.email_extraction import (apache_extractor, blogs_extractor,
-                                  enron_extractor)
-from src.simulation_utils import (generate_adv_knowledge,
-                                  generate_adv_knowledge_fixed_nb_docs,
-                                  padding_countermeasure, simulate_attack)
+from src.email_extraction import apache_extractor, blogs_extractor, enron_extractor
+from src.simulation_utils import (
+    generate_adv_knowledge,
+    generate_adv_knowledge_fixed_nb_docs,
+    padding_countermeasure,
+    simulate_attack,
+)
 
 epsilon_sim = lambda coocc_1, coocc_2: np.linalg.norm(coocc_1 - coocc_2)
 
@@ -109,7 +111,7 @@ def atk_comparison(queryset_size=QUERYSET_SIZE, result_file="atk_comparison.csv"
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for i in tqdm.tqdm(
-            iterable=[i for i in range(200)],
+            iterable=[i for i in range(51)],
             desc="Running the experiments",
         ):
             curr_sum = (max_sum - min_sum) * (i * 2) / 100 + min_sum
