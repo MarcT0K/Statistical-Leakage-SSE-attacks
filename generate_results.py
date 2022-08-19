@@ -20,6 +20,7 @@ from src.email_extraction import (
 from src.simulation_utils import (
     generate_adv_knowledge,
     generate_adv_knowledge_fixed_nb_docs,
+    generate_known_queries,
     padding_countermeasure,
     simulate_attack,
 )
@@ -64,7 +65,7 @@ def similarity_exploration():
                 size=(int(kw_max_docs * (i + 1) * 0.02),),
                 replace=False,
             )
-            for j in tqdm.tqdm(iterable=range(50)):
+            for j in range(50):
                 sub_choice_serv = np.random.choice(
                     range(serv_max_docs),
                     size=(int(serv_max_docs * (j + 1) * 0.02),),
@@ -483,17 +484,6 @@ def risk_assessment_countermeasure_tuning():
 ########## UNIFORM SAMPLING EXPERIMENTS ###########""
 
 
-def Z_mat_to_bonferroni(Z_mat):
-    z_flat = Z_mat.flatten()
-    z_flat = z_flat[~np.isnan(z_flat)]
-    p = (
-        (scipy.stats.norm.sf(z_flat) * 2).min()
-        * (Z_mat.shape[0] * (Z_mat.shape[0] + 1))
-        / 2
-    )
-    return p
-
-
 def binom_test_p_values(coocc_1, n_1, coocc_2, n_2):
     assert n_1 > 0 and n_2 > 0
     avg_coocc = (coocc_1 * n_1 + coocc_2 * n_2) / (n_1 + n_2)
@@ -503,82 +493,69 @@ def binom_test_p_values(coocc_1, n_1, coocc_2, n_2):
     return 2 * scipy.stats.norm.sf(abs(z_stats))
 
 
-def prop_reject(p_values_mat, threshold):
-    m = p_values_mat.shape[0]
-    test_mat = np.tril(p_values_mat)  # symmetric matrix in our case
-    nb_rejections = (test_mat < threshold).sum() - m * (
-        m - 1
-    ) / 2  # we remove the elements we set to 0
-    return nb_rejections / (m * (m + 1) / 2)
-
-
 def bonferroni_experiments():
-    voc_size = 1000
+    voc_size = VOC_SIZE
     extractor = apache_extractor(voc_size)
     occ_mat = extractor.occ_array
-    n_tot = extractor.occ_array.shape[0]
 
-    experiment_params = [
-        0.1 * (j + 1) for j in range(5) for _k in range(5)
-    ]  # size of the attacker document set
-
-    with open("bonferoni_tests.csv", "w", newline="", encoding="utf-8") as csvfile:
+    with open("bonferroni_tests.csv", "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = [
             "Nb similar docs",
             "Nb server docs",
             "Server voc size",
             "Similarity",
-            "Tests .05",
-            "Tests .01",
-            "Tests .001",
-            "Avg p-value",
+            "Ref Score Acc",
             "Bonferroni",
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
-        for (i, attacker_size_ratio) in enumerate(experiment_params):
-            print(f"Experiment {i+1} out of {len(experiment_params)}")
-            choice_serv = np.random.choice(
-                range(n_tot), size=(int(n_tot * 0.6),), replace=False
-            )
-            ind_serv = np.zeros(n_tot, dtype=bool)
-            ind_serv[choice_serv] = True
-            serv_mat = occ_mat[ind_serv, :]
-            kw_mat = occ_mat[~ind_serv, :]
-            kw_max_docs = kw_mat.shape[0]
-
-            sub_choice_kw = np.random.choice(
-                range(kw_max_docs),
-                size=(int(kw_max_docs * attacker_size_ratio),),
-                replace=False,
-            )
-            coocc_td = serv_mat.T @ serv_mat / serv_mat.shape[0]
-            coocc_kw = (
-                kw_mat[sub_choice_kw, :].T
-                @ kw_mat[sub_choice_kw, :]
-                / kw_mat[sub_choice_kw, :].shape[0]
+        for i in tqdm.tqdm(
+            iterable=[i for i in range(100)],
+            desc="Running the experiments",
+        ):
+            # Auxiliary knowledge generation
+            voc = list(extractor.get_sorted_voc())
+            (
+                ind_mat,
+                atk_mat,
+                queries,
+                queries_ind,
+                known_queries,
+            ) = generate_adv_knowledge(
+                occ_mat, 0.4, 0.6, voc, QUERYSET_SIZE, KNOWN_QUERIES
             )
 
+            # Refined score attack
+            ref_acc, _runtime = simulate_attack(
+                RefinedScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=ind_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
+            )
+
+            # Compute espilon-similarity
+            ind_doc_coocc = ind_mat.T @ ind_mat / ind_mat.shape[0]
+            atk_full_coocc = atk_mat.T @ atk_mat / atk_mat.shape[0]
             p_values = binom_test_p_values(
-                coocc_kw,
-                kw_mat[sub_choice_kw, :].shape[0],
-                coocc_td,
-                serv_mat.shape[0],
+                atk_full_coocc,
+                atk_full_coocc.shape[0],
+                ind_doc_coocc,
+                ind_doc_coocc.shape[0],
             )
+            p_cor = p_values.min() * (voc_size * (voc_size + 1)) / 2
 
             writer.writerow(
                 {
-                    "Nb similar docs": kw_mat[sub_choice_kw, :].shape[0],
-                    "Nb server docs": serv_mat.shape[0],
+                    "Nb similar docs": atk_full_coocc.shape[0],
+                    "Nb server docs": ind_doc_coocc.shape[0],
                     "Server voc size": voc_size,
-                    "Similarity": epsilon_sim(coocc_kw, coocc_td),
-                    "Tests .05": prop_reject(p_values, 0.05),
-                    "Tests .01": prop_reject(p_values, 0.01),
-                    "Tests .001": prop_reject(p_values, 0.001),
-                    "Avg p-value": np.nansum(np.tril(p_values))
-                    / ((voc_size + 1) * voc_size / 2),
-                    "Bonferroni": Z_mat_to_bonferroni(p_values),
+                    "Similarity": epsilon_sim(atk_full_coocc, ind_doc_coocc),
+                    "Ref Score Acc": ref_acc,
+                    "p_cor": p_cor,
                 }
             )
 
@@ -592,49 +569,59 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
             "Year split",
             "Server voc size",
             "Similarity",
-            "Tests .05",
-            "Tests .01",
-            "Tests .001",
-            "Avg p-value",
+            "Ref Score Acc",
+            "p_cor",
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for (i, year_split) in enumerate([2003, 2005, 2007, 2009]):
             print(f"Experiment {i+1} out of {len([2003, 2005, 2007, 2009])}")
-            stored_docs = extract_apache_ml_by_year(to_year=year_split)
-            similar_docs = extract_apache_ml_by_year(from_year=year_split)
+            ind_docs = extract_apache_ml_by_year(to_year=year_split)
+            atk_docs = extract_apache_ml_by_year(from_year=year_split)
 
-            real_extractor = KeywordExtractor(stored_docs, voc_size)
-            sim_occ_mat = compute_occ_mat(
-                similar_docs, real_extractor.sorted_voc_with_occ
+            real_extractor = KeywordExtractor(ind_docs, voc_size)
+            ind_mat = real_extractor.occ_array
+            atk_mat = compute_occ_mat(atk_docs, real_extractor.sorted_voc_with_occ)
+
+            voc = real_extractor.get_sorted_voc()
+            queries_ind = np.random.choice(len(voc), QUERYSET_SIZE, replace=False)
+            queries = [voc[ind] for ind in queries_ind]
+            known_queries = generate_known_queries(
+                similar_wordlist=voc,
+                stored_wordlist=queries,
+                nb_queries=KNOWN_QUERIES,
             )
 
-            coocc_td = (
-                real_extractor.occ_array.T
-                @ real_extractor.occ_array
-                / real_extractor.occ_array.shape[0]
+            ref_acc, _runtime = simulate_attack(
+                RefinedScoreAttacker,
+                keyword_occ_array=atk_mat,
+                keyword_sorted_voc=voc,
+                trapdoor_occ_array=ind_mat[:, queries_ind],
+                trapdoor_sorted_voc=queries,
+                nb_stored_docs=ind_mat.shape[0],
+                known_queries=known_queries,
             )
-            coocc_kw = sim_occ_mat.T @ sim_occ_mat / sim_occ_mat.shape[0]
+
+            coocc_ind = ind_mat.T @ ind_mat / ind_mat.shape[0]
+            coocc_atk = atk_mat.T @ atk_mat / atk_mat.shape[0]
 
             p_values = binom_test_p_values(
-                coocc_kw,
-                sim_occ_mat.shape[0],
-                coocc_td,
-                real_extractor.occ_array.shape[0],
+                coocc_atk,
+                atk_mat.shape[0],
+                coocc_ind,
+                ind_mat.shape[0],
             )
+            p_cor = p_values.min() * (voc_size * (voc_size + 1)) / 2
 
             writer.writerow(
                 {
-                    "Nb similar docs": sim_occ_mat.shape[0],
-                    "Nb server docs": real_extractor.occ_array.shape[0],
+                    "Nb similar docs": atk_mat.shape[0],
+                    "Nb server docs": ind_mat.shape[0],
                     "Year split": year_split,
                     "Server voc size": voc_size,
-                    "Similarity": epsilon_sim(coocc_kw, coocc_td),
-                    "Tests .05": prop_reject(p_values, 0.05),
-                    "Tests .01": prop_reject(p_values, 0.01),
-                    "Tests .001": prop_reject(p_values, 0.001),
-                    "Avg p-value": np.nansum(np.tril(p_values))
-                    / ((voc_size + 1) * voc_size / 2),
+                    "Similarity": epsilon_sim(coocc_atk, coocc_ind),
+                    "Ref Score Acc": ref_acc,
+                    "p_cor": p_cor,
                 }
             )
 
