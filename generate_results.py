@@ -124,7 +124,7 @@ def atk_comparison(queryset_size=QUERYSET_SIZE, result_file="atk_comparison.csv"
                 queries,
                 queries_ind,
                 known_queries,
-            ) = generate_adv_knowledge(
+            ) = generate_adv_knowledge_fixed_nb_docs(
                 occ_mat, curr_n, curr_n, voc, queryset_size, KNOWN_QUERIES
             )
 
