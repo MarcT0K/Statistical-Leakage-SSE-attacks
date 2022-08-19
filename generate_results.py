@@ -505,12 +505,12 @@ def bonferroni_experiments():
             "Server voc size",
             "Similarity",
             "Ref Score Acc",
-            "Bonferroni",
+            "p_cor",
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
-        for i in tqdm.tqdm(
+        for _i in tqdm.tqdm(
             iterable=[i for i in range(100)],
             desc="Running the experiments",
         ):
@@ -546,12 +546,13 @@ def bonferroni_experiments():
                 ind_doc_coocc,
                 ind_doc_coocc.shape[0],
             )
+            p_values[np.isnan(p_values)] = 1
             p_cor = p_values.min() * (voc_size * (voc_size + 1)) / 2
 
             writer.writerow(
                 {
-                    "Nb similar docs": atk_full_coocc.shape[0],
-                    "Nb server docs": ind_doc_coocc.shape[0],
+                    "Nb similar docs": atk_mat.shape[0],
+                    "Nb server docs": ind_mat.shape[0],
                     "Server voc size": voc_size,
                     "Similarity": epsilon_sim(atk_full_coocc, ind_doc_coocc),
                     "Ref Score Acc": ref_acc,
@@ -583,7 +584,7 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
             ind_mat = real_extractor.occ_array
             atk_mat = compute_occ_mat(atk_docs, real_extractor.sorted_voc_with_occ)
 
-            voc = real_extractor.get_sorted_voc()
+            voc = list(real_extractor.get_sorted_voc())
             queries_ind = np.random.choice(len(voc), QUERYSET_SIZE, replace=False)
             queries = [voc[ind] for ind in queries_ind]
             known_queries = generate_known_queries(
@@ -611,6 +612,7 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
                 coocc_ind,
                 ind_mat.shape[0],
             )
+            p_values[np.isnan(p_values)] = 1
             p_cor = p_values.min() * (voc_size * (voc_size + 1)) / 2
 
             writer.writerow(
