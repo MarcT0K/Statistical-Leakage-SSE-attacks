@@ -494,7 +494,7 @@ def binom_test_p_values(coocc_1, n_1, coocc_2, n_2):
 
 
 def bonferroni_experiments():
-    voc_size = VOC_SIZE
+    voc_size = 1000
     extractor = apache_extractor(voc_size)
     occ_mat = extractor.occ_array
 
@@ -523,7 +523,7 @@ def bonferroni_experiments():
                 queries_ind,
                 known_queries,
             ) = generate_adv_knowledge(
-                occ_mat, 0.4, 0.6, voc, QUERYSET_SIZE, KNOWN_QUERIES
+                occ_mat, 0.5, 0.5, voc, QUERYSET_SIZE, KNOWN_QUERIES
             )
 
             # Refined score attack
@@ -542,9 +542,9 @@ def bonferroni_experiments():
             atk_full_coocc = atk_mat.T @ atk_mat / atk_mat.shape[0]
             p_values = binom_test_p_values(
                 atk_full_coocc,
-                atk_full_coocc.shape[0],
+                atk_mat.shape[0],
                 ind_doc_coocc,
-                ind_doc_coocc.shape[0],
+                ind_mat.shape[0],
             )
             p_values[np.isnan(p_values)] = 1
             p_cor = p_values.min() * (voc_size * (voc_size + 1)) / 2
