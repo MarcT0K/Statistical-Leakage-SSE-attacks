@@ -9,7 +9,6 @@ import os
 import pickle
 
 import colorlog
-import numpy as np
 import pandas as pd
 import tqdm
 from bs4 import BeautifulSoup
@@ -20,7 +19,7 @@ logger = colorlog.getLogger("RaaC paper")
 
 
 def split_df(dframe, frac=0.5):
-    first_split = dframe.sample(frac=frac, random_state=np.random.get_state())
+    first_split = dframe.sample(frac=frac)  # Random state is associated to numpy
     second_split = dframe.drop(first_split.index)
     return first_split, second_split
 
