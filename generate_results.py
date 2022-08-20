@@ -484,13 +484,16 @@ def risk_assessment_countermeasure_tuning():
 ########## UNIFORM SAMPLING EXPERIMENTS ###########""
 
 
-def binom_test_p_values(coocc_1, n_1, coocc_2, n_2):
+def compute_p_cor(coocc_1, n_1, coocc_2, n_2):
     assert n_1 > 0 and n_2 > 0
     avg_coocc = (coocc_1 * n_1 + coocc_2 * n_2) / (n_1 + n_2)
     z_stats = (coocc_1 - coocc_2) / np.sqrt(
         avg_coocc * (1 - avg_coocc) * (1 / n_1 + 1 / n_2)
     )
-    return 2 * scipy.stats.norm.sf(abs(z_stats))
+    p_values = 2 * scipy.stats.norm.sf(abs(z_stats))
+    p_values[np.isnan(p_values)] = 1
+    p_cor = p_values.min() * (p_values.shape[0] * (p_values.shape[0] + 1)) / 2
+    return p_cor
 
 
 def bonferroni_experiments():
@@ -540,14 +543,12 @@ def bonferroni_experiments():
             # Compute espilon-similarity
             ind_doc_coocc = ind_mat.T @ ind_mat / ind_mat.shape[0]
             atk_full_coocc = atk_mat.T @ atk_mat / atk_mat.shape[0]
-            p_values = binom_test_p_values(
+            p_cor = compute_p_cor(
                 atk_full_coocc,
                 atk_mat.shape[0],
                 ind_doc_coocc,
                 ind_mat.shape[0],
             )
-            p_values[np.isnan(p_values)] = 1
-            p_cor = p_values.min() * (voc_size * (voc_size + 1)) / 2
 
             writer.writerow(
                 {
@@ -606,14 +607,12 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
             coocc_ind = ind_mat.T @ ind_mat / ind_mat.shape[0]
             coocc_atk = atk_mat.T @ atk_mat / atk_mat.shape[0]
 
-            p_values = binom_test_p_values(
+            p_cor = compute_p_cor(
                 coocc_atk,
                 atk_mat.shape[0],
                 coocc_ind,
                 ind_mat.shape[0],
             )
-            p_values[np.isnan(p_values)] = 1
-            p_cor = p_values.min() * (voc_size * (voc_size + 1)) / 2
 
             writer.writerow(
                 {
@@ -670,3 +669,7 @@ if __name__ == "__main__":
     risk_assessment_countermeasure_tuning()
     fix_randomness(51)
     risk_assessment_truncated_vocabulary()
+    fix_randomness(52)
+    bonferroni_experiments()
+    fix_randomness(53)
+    bonferroni_experiments_by_year()
