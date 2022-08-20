@@ -11,7 +11,7 @@ import tqdm
 from src.attacks.ihop import IHOPAttacker
 from src.attacks.score import RefinedScoreAttacker, ScoreAttacker
 from src.keyword_extract import KeywordExtractor, compute_occ_mat
-from src.email_extraction import (
+from src.document_extraction import (
     apache_extractor,
     blogs_extractor,
     enron_extractor,

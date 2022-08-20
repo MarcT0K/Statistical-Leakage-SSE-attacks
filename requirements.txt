@@ -1,9 +1,10 @@
 colorlog
 pandas
 bs4
+lxml
+matplotlib
 nltk
 numpy
 scipy
-tqdm
-matplotlib
 sklearn
+tqdm

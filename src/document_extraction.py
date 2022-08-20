@@ -91,7 +91,7 @@ def extract_apache_ml_by_year(
     return pd.DataFrame(data={"filename": mail_ids, "mail_body": mail_contents})
 
 
-def extract_blogs(blog_dir="./blogs") -> pd.DataFrame:
+def extract_blogs(blog_dir="./blogs", truncation=200000) -> pd.DataFrame:
     path = os.path.expanduser(blog_dir)
     blogs = glob.glob(f"{path}/*")
     posts = []
@@ -108,7 +108,9 @@ def extract_blogs(blog_dir="./blogs") -> pd.DataFrame:
             post_ids.append(f"{blog_file.name}_{i}")
             i += 1
 
-    return pd.DataFrame(data={"filename": post_ids, "mail_body": posts})
+    df = pd.DataFrame(data={"filename": post_ids, "mail_body": posts})
+
+    return df.sample(truncation)
 
 
 def generic_extractor(extract_function, dataset_name, voc_size):
