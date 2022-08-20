@@ -9,6 +9,7 @@ import os
 import pickle
 
 import colorlog
+import numpy as np
 import pandas as pd
 import tqdm
 from bs4 import BeautifulSoup
@@ -19,7 +20,7 @@ logger = colorlog.getLogger("RaaC paper")
 
 
 def split_df(dframe, frac=0.5):
-    first_split = dframe.sample(frac=frac)
+    first_split = dframe.sample(frac=frac, random_state=np.random.get_state())
     second_split = dframe.drop(first_split.index)
     return first_split, second_split
 
@@ -108,9 +109,9 @@ def extract_blogs(blog_dir="./blogs", truncation=200000) -> pd.DataFrame:
             post_ids.append(f"{blog_file.name}_{i}")
             i += 1
 
-    df = pd.DataFrame(data={"filename": post_ids, "mail_body": posts})
+    dframe = pd.DataFrame(data={"filename": post_ids, "mail_body": posts})
 
-    return df.sample(truncation, random_state=1337)
+    return dframe.sample(truncation, random_state=1337)
 
 
 def generic_extractor(extract_function, dataset_name, voc_size):
