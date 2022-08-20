@@ -110,7 +110,7 @@ def extract_blogs(blog_dir="./blogs", truncation=200000) -> pd.DataFrame:
 
     df = pd.DataFrame(data={"filename": post_ids, "mail_body": posts})
 
-    return df.sample(truncation)
+    return df.sample(truncation, random_state=1337)
 
 
 def generic_extractor(extract_function, dataset_name, voc_size):
