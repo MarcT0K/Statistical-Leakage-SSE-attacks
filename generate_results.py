@@ -193,8 +193,10 @@ def atk_comparison(queryset_size=QUERYSET_SIZE, result_file="atk_comparison.csv"
             )
 
 
-def generate_ref_score_results(extractor_function, dataset_name, truncation_size=-1):
-    extractor = extractor_function(1000)
+def generate_ref_score_results(
+    extractor_function, dataset_name, truncation_size=-1, voc_size=1000
+):
+    extractor = extractor_function(voc_size)
     occ_mat = extractor.occ_array
 
     if truncation_size != -1:
@@ -673,3 +675,5 @@ if __name__ == "__main__":
     bonferroni_experiments()
     fix_randomness(53)
     bonferroni_experiments_by_year()
+    fix_randomness(54)
+    generate_ref_score_results(enron_extractor, "enron_extreme", 4000)
