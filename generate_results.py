@@ -676,4 +676,4 @@ if __name__ == "__main__":
     fix_randomness(53)
     bonferroni_experiments_by_year()
     fix_randomness(54)
-    generate_ref_score_results(enron_extractor, "enron_extreme", 4000)
+    generate_ref_score_results(enron_extractor, "enron_extreme", voc_size=4000)

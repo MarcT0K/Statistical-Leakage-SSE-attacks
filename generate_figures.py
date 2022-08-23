@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from cycler import cycler
 from sklearn.linear_model import LinearRegression, QuantileRegressor
+import scipy.interpolate as interpolate
 
 epsilon_sim = lambda coocc_1, coocc_2: np.linalg.norm(coocc_1 - coocc_2)
 
@@ -33,49 +34,69 @@ plt.rcParams.update(params)
 
 
 def fig_epsilon_nb_docs():
+    fig, ax = plt.subplots()
+
     with open("similarity_exploration.csv", "r", encoding="utf-8") as csvfile:
         csvfile.readline()
         arr = np.loadtxt(csvfile, delimiter=",")
 
     x = np.sqrt(1 / arr[:, 0] + 1 / arr[:, 1])
     y = arr[:, 2]
-    a, b = np.polyfit(x, y, 1)
-    plt.scatter(x, y)
-    plt.axline((0, b), slope=a, color="red")
-    plt.xlabel(r"$\sqrt{\frac{1}{n_{atk}}+\frac{1}{n_{ind}}}$")
-    plt.ylabel(r"$\epsilon$-similarity")
-    plt.text(0.0005, 3.7, f"Slope: {a:.2f}\nIntercept: {b:.4f}")
-    plt.grid()
-    plt.tight_layout()
-    plt.savefig("epsilon_nb_docs.png", dpi=400)
+    slope, intercept = np.polyfit(x, y, 1)
+    ax.scatter(x, y, color="black", alpha=0.5, label="Observations")
+    ax.axline(
+        (0, intercept),
+        slope=slope,
+        label=r"Linear reg. ($y = bx + a$)",
+    )
+    ax.plot([], [], " ", label=rf"$a={slope:.2f}$ / $b={intercept:.3f}$")
+    ax.set(
+        xlabel=r"$\sqrt{\frac{1}{n_{atk}}+\frac{1}{n_{ind}}}$",
+        ylabel=(r"$\epsilon$-similarity"),
+    )
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig("epsilon_nb_docs.png", dpi=400)
     plt.cla()
 
-    mask = arr[:, 0] == 2023  # n_atk fixed
+    mask = arr[:, 0] == 2022  # n_atk fixed
     x = 1 / arr[mask, 1]
     y = arr[mask, 2]
-    a, b = np.polyfit(x, y, 1)
-    plt.scatter(x, y)
-    plt.axline((0, b), slope=a, color="red")
-    plt.xlabel(r"$\frac{1}{n_{ind}}$, Fixed $n_{atk}$=2K")
-    plt.ylabel(r"$\epsilon$-similarity")
-    plt.text(0.00001, 2.8, f"Slope: {a:.2f}\nIntercept: {b:.4f}")
-    plt.grid()
-    plt.tight_layout()
-    plt.savefig("epsilon_n_atk_fixed.png", dpi=400)
+    slope, intercept = np.polyfit(x, y, 1)
+    ax.scatter(x, y, color="black", alpha=0.5, label="Observations")
+    ax.axline(
+        (0, intercept),
+        slope=slope,
+        label=r"Linear reg. ($y = bx + a$)",
+    )
+    ax.set(
+        xlabel=r"$\frac{1}{n_{ind}}$, Fixed $n_{atk}$=2K",
+        ylabel=r"$\epsilon$-similarity",
+    )
+    ax.plot([], [], " ", label=rf"$a={slope:.2f}$ / $b={intercept:.3f}$")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig("epsilon_n_atk_fixed.png", dpi=400)
     plt.cla()
 
     mask = arr[:, 1] == 1820  # n_ind fixed
     x = 1 / arr[mask, 0]
     y = arr[mask, 2]
-    a, b = np.polyfit(x, y, 1)
-    plt.scatter(x, y)
-    plt.axline((0, b), slope=a, color="red")
-    plt.xlabel(r"$\frac{1}{n_{atk}}$, Fixed $n_{ind}$=1.8K")
-    plt.ylabel(r"$\epsilon$-similarity")
-    plt.text(0.00001, 3.5, f"Slope: {a:.2f}\nIntercept: {b:.4f}")
-    plt.grid()
-    plt.tight_layout()
-    plt.savefig("epsilon_n_ind_fixed.png", dpi=400)
+    slope, intercept = np.polyfit(x, y, 1)
+    ax.scatter(x, y, color="black", alpha=0.5, label="Observations")
+    ax.axline(
+        (0, intercept),
+        slope=slope,
+        label=r"Linear reg. ($y = bx + a$)",
+    )
+    ax.set(
+        xlabel=r"$\frac{1}{n_{atk}}$, Fixed $n_{ind}$=1.8K",
+        ylabel=r"$\epsilon$-similarity",
+    )
+    ax.plot([], [], " ", label=rf"$a={slope:.2f}$ / $b={intercept:.3f}$")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig("epsilon_n_ind_fixed.png", dpi=400)
     plt.cla()
 
 
@@ -112,6 +133,12 @@ def fig_attack_analysis(dataset_name):
 
     x = dataframe["Epsilon"]
     y = dataframe["Refined Score Acc"]
+
+    mask = y != 0
+    assert sum(~mask) < 1 / 3 * y.shape[0]
+    y = y[mask]
+    x = x[mask]
+
     log_x = np.array(np.log(x))
     log_y = np.array(logit(y))
 
@@ -135,7 +162,7 @@ def fig_attack_analysis(dataset_name):
         ylabel=r"$\mathrm{logit}(\mathrm{Accuracy})$",
     )
 
-    ax.set_ylim((log_y.min() - 0.1, log_y.max() + 0.1))
+    ax.set_ylim((log_y.min() - 0.5, log_y.max() + 0.5))
     ax.legend()
     fig.tight_layout()
     fig.savefig(f"atk_analysis_{dataset_name}_logit.png", dpi=400)
@@ -149,7 +176,7 @@ def fig_attack_analysis(dataset_name):
         ylabel=r"$\mathrm{logit}(\mathrm{Accuracy})$",
     )
     ax.set_xlim((log_x.min() - 0.1, log_x.max() + 0.1))
-    ax.set_ylim((log_y.min() - 0.1, log_y.max() + 0.1))
+    ax.set_ylim((log_y.min() - 0.5, log_y.max() + 0.5))
     ax.legend()
     fig.tight_layout()
     fig.savefig(f"atk_analysis_{dataset_name}_logit-log.png", dpi=400)
@@ -165,6 +192,112 @@ def fig_attack_analysis(dataset_name):
     ax.legend()
     fig.tight_layout()
     fig.savefig(f"atk_analysis_{dataset_name}.png", dpi=400)
+
+
+def fig_comparison_atk():
+    def data_to_lin_reg(dataframe, col_name):
+        x = np.log(dataframe["Epsilon"])
+        y = logit(dataframe[col_name])
+        mask = abs(y) != np.inf
+        assert sum(~mask) < 1 / 3 * y.shape[0]  # To avoid removing too many points
+        y = y[mask].to_numpy()
+        x = x[mask].to_numpy()
+
+        linear_regression = LinearRegression().fit(x.reshape(-1, 1), y.reshape(-1, 1))
+        slope = linear_regression.coef_[0, 0]
+        intercept = linear_regression.intercept_[0]
+        return slope, intercept
+
+    fig, ax = plt.subplots()
+    dataframe = pd.read_csv("atk_comparison.csv")
+    # Score+RefinedScore+IHOP risk assessment
+    x = dataframe["Epsilon"]
+    step_size = x.max() / 500
+    x_pred = np.arange(step_size, x.max(), step_size)
+
+    ihop_quant_slope, ihop_quant_intercept = data_to_lin_reg(dataframe, "IHOP Acc")
+    y_quant_ihop = posit(ihop_quant_slope * np.log(x_pred) + ihop_quant_intercept)
+    ref_quant_slope, ref_quant_intercept = data_to_lin_reg(
+        dataframe, "Refined Score Acc"
+    )
+    score_quant_slope, score_quant_intercept = data_to_lin_reg(dataframe, "Score Acc")
+    y_quant_ref = posit(ref_quant_slope * np.log(x_pred) + ref_quant_intercept)
+    y_quant_score = posit(score_quant_slope * np.log(x_pred) + score_quant_intercept)
+    ax.plot(x_pred, y_quant_ihop, label="IHOP")
+    ax.plot(x_pred, y_quant_ref, label="Refined Score")
+    ax.plot(x_pred, y_quant_score, label="Score")
+    ax.legend()
+    ax.set(
+        xlabel=r"$\epsilon$-similarity",
+        ylabel="Accuracy",
+    )
+    fig.tight_layout()
+    fig.savefig("atk_comparison.png", dpi=400)
+
+
+def fig_attack_analysis_tail_distribution(dataset_name):
+    fig, ax = plt.subplots()
+    dataframe = pd.read_csv(f"{dataset_name}_extreme_results.csv")
+    dataframe = dataframe.sort_values(by="Epsilon")
+
+    x = dataframe["Epsilon"]
+    y = dataframe["Refined Score Acc"]
+
+    mask = y != 0
+    assert sum(~mask) < 1 / 3 * y.shape[0]
+    y = y[mask]
+    x = x[mask]
+
+    log_x = np.array(np.log(x))
+    log_y = np.array(logit(y))
+
+    linear_regression = LinearRegression().fit(
+        log_x.reshape(-1, 1), log_y.reshape(-1, 1)
+    )
+    lin_slope = linear_regression.coef_[0, 0]
+    lin_intercept = linear_regression.intercept_[0]
+
+    # Peut-être que je dois trier cette liste
+    spline_t, spline_c, spline_k = interpolate.splrep(
+        log_x, log_y, k=1, t=np.array([0.5])
+    )
+    spline = interpolate.BSpline(spline_t, spline_c, spline_k, extrapolate=True)
+
+    step_size = x.max() / 500
+    x_pred = np.arange(step_size, x.max(), step_size)
+
+    # Compute the predictions
+    log_y_lin = lin_slope * np.log(x_pred) + lin_intercept
+    y_lin = posit(log_y_lin)
+    log_y_spline = spline(np.log(x_pred))
+    y_spline = posit(log_y_spline)
+
+    # Visualization in  the logit-log space
+    ax.scatter(log_x, log_y, color="black", alpha=0.2, label="Observations")
+    ax.plot(np.log(x_pred), log_y_lin, label="Linear")
+    ax.plot(np.log(x_pred), log_y_spline, label="B-spline")
+    ax.set(
+        xlabel=r"$\log(\epsilon$-similarity$)$",
+        ylabel=r"$\mathrm{logit}(\mathrm{Accuracy})$",
+    )
+    ax.set_xlim((log_x.min() - 0.1, log_x.max() + 0.1))
+    ax.set_ylim((log_y.min() - 0.5, log_y.max() + 0.5))
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(f"atk_analysis_{dataset_name}_extreme_logit-log.png", dpi=400)
+    plt.cla()
+
+    # Visualization in  the standard space
+    ax.scatter(x, y, color="black", alpha=0.2, label="Observations")
+    ax.plot(x_pred, y_lin, label="Linear")
+    ax.plot(x_pred, y_spline, label="B-spline")
+    ax.set(
+        xlabel=r"$\epsilon$-similarity",
+        ylabel="Accuracy",
+    )
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(f"atk_analysis_{dataset_name}_extreme.png", dpi=400)
 
 
 def fig_indiv_risk_assessment(col_name):
@@ -205,7 +338,7 @@ def fig_indiv_risk_assessment(col_name):
         ylabel=r"$\mathrm{logit}(\mathrm{Accuracy})$",
     )
     ax.set_xlim((log_x.min() - 0.1, log_x.max() + 0.1))
-    ax.set_ylim((log_y.min() - 0.1, log_y.max() + 0.1))
+    ax.set_ylim((log_y.min() - 0.5, log_y.max() + 0.5))
     ax.legend()
     fig.tight_layout()
     fig.savefig(f"risk_assess_{(col_name.replace(' ','_'))}_log.png", dpi=400)
@@ -327,7 +460,7 @@ def lambda_risk_acc_to_document_size(col_name, n_atk_max=None):
     # Compute the prediction
     quant095_slope, quant095_intercept = data_to_quant_reg(dataframe, col_name)
 
-    # Remainder logit(acc) = b * log(1/natk + 1/nind) + a
+    # Remainder logit(acc) = intercept * log(1/natk + 1/nind) + slope
     if n_atk_max is None:
         func = lambda acc_threshold: 1 / np.exp(
             (logit(acc_threshold) - quant095_intercept) / quant095_slope
@@ -373,11 +506,15 @@ if __name__ == "__main__":
     os.chdir("results")
 
     # Call all functions defined in this file
-    # fig_epsilon_nb_docs()
+    fig_epsilon_nb_docs()
 
     fig_attack_analysis("enron")
+    fig_attack_analysis("enron_extreme")
     fig_attack_analysis("apache")
-    # fig_attack_analysis("bloggers")
+    fig_attack_analysis("apache_reduced")
+    fig_attack_analysis("blogs")
+    fig_attack_analysis("blogs_reduced")
+    fig_comparison_atk()
 
     fig_indiv_risk_assessment("IHOP Acc")
     fig_indiv_risk_assessment("Refined Score Acc")
