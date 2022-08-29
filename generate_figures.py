@@ -49,7 +49,7 @@ def fig_epsilon_nb_docs():
         slope=slope,
         label=r"Linear reg. ($y = bx + a$)",
     )
-    ax.plot([], [], " ", label=rf"$a={slope:.2f}$ / $b={intercept:.3f}$")
+    ax.plot([], [], " ", label=rf"$b={slope:.2f}$ / $a={intercept:.3f}$")
     ax.set(
         xlabel=r"$\sqrt{\frac{1}{n_{atk}}+\frac{1}{n_{ind}}}$",
         ylabel=(r"$\epsilon$-similarity"),
@@ -73,7 +73,7 @@ def fig_epsilon_nb_docs():
         xlabel=r"$\frac{1}{n_{ind}}$, Fixed $n_{atk}$=2K",
         ylabel=r"$\epsilon$-similarity",
     )
-    ax.plot([], [], " ", label=rf"$a={slope:.2f}$ / $b={intercept:.3f}$")
+    ax.plot([], [], " ", label=rf"$b={slope:.2f}$ / $a={intercept:.3f}$")
     ax.legend()
     fig.tight_layout()
     fig.savefig("epsilon_n_atk_fixed.png", dpi=400)
@@ -89,11 +89,11 @@ def fig_epsilon_nb_docs():
         slope=slope,
         label=r"Linear reg. ($y = bx + a$)",
     )
+    ax.plot([], [], " ", label=rf"$b={slope:.2f}$ / $a={intercept:.3f}$")
     ax.set(
         xlabel=r"$\frac{1}{n_{atk}}$, Fixed $n_{ind}$=1.8K",
         ylabel=r"$\epsilon$-similarity",
     )
-    ax.plot([], [], " ", label=rf"$a={slope:.2f}$ / $b={intercept:.3f}$")
     ax.legend()
     fig.tight_layout()
     fig.savefig("epsilon_n_ind_fixed.png", dpi=400)
@@ -170,7 +170,8 @@ def fig_attack_analysis(dataset_name):
 
     # Visualization in  the logit-log space
     ax.scatter(log_x, log_y, color="black", alpha=0.5, label="Observations")
-    ax.plot(np.log(x_pred), log_y_lin, label="Linear")
+    ax.plot(np.log(x_pred), log_y_lin, label=r"Linear reg. ($y = bx + a$)")
+    ax.plot([], [], " ", label=rf"$b={lin_slope:.2f}$ / $a={lin_intercept:.3f}$")
     ax.set(
         xlabel=r"$\log(\epsilon$-similarity$)$",
         ylabel=r"$\mathrm{logit}(\mathrm{Accuracy})$",
@@ -184,7 +185,7 @@ def fig_attack_analysis(dataset_name):
 
     # Visualization in  the standard space
     ax.scatter(x, y, color="black", alpha=0.5, label="Observations")
-    ax.plot(x_pred, y_lin, label="Linear")
+    ax.plot(x_pred, y_lin, label="Regression result")
     ax.set(
         xlabel=r"$\epsilon$-similarity",
         ylabel="Accuracy",
@@ -235,9 +236,9 @@ def fig_comparison_atk():
     fig.savefig("atk_comparison.png", dpi=400)
 
 
-def fig_attack_analysis_tail_distribution(dataset_name):
+def fig_attack_analysis_tail_distribution():
     fig, ax = plt.subplots()
-    dataframe = pd.read_csv(f"{dataset_name}_extreme_results.csv")
+    dataframe = pd.read_csv("enron_extreme_results.csv")
     dataframe = dataframe.sort_values(by="Epsilon")
 
     x = dataframe["Epsilon"]
@@ -259,7 +260,7 @@ def fig_attack_analysis_tail_distribution(dataset_name):
 
     # Peut-être que je dois trier cette liste
     spline_t, spline_c, spline_k = interpolate.splrep(
-        log_x, log_y, k=1, t=np.array([0.5])
+        log_x, log_y, k=1, t=np.array([0.55])
     )
     spline = interpolate.BSpline(spline_t, spline_c, spline_k, extrapolate=True)
 
@@ -274,7 +275,7 @@ def fig_attack_analysis_tail_distribution(dataset_name):
 
     # Visualization in  the logit-log space
     ax.scatter(log_x, log_y, color="black", alpha=0.2, label="Observations")
-    ax.plot(np.log(x_pred), log_y_lin, label="Linear")
+    ax.plot(np.log(x_pred), log_y_lin, label="Linear regression")
     ax.plot(np.log(x_pred), log_y_spline, label="B-spline")
     ax.set(
         xlabel=r"$\log(\epsilon$-similarity$)$",
@@ -284,12 +285,12 @@ def fig_attack_analysis_tail_distribution(dataset_name):
     ax.set_ylim((log_y.min() - 0.5, log_y.max() + 0.5))
     ax.legend()
     fig.tight_layout()
-    fig.savefig(f"atk_analysis_{dataset_name}_extreme_logit-log.png", dpi=400)
+    fig.savefig("atk_analysis_enron_extreme_logit-log.png", dpi=400)
     plt.cla()
 
     # Visualization in  the standard space
     ax.scatter(x, y, color="black", alpha=0.2, label="Observations")
-    ax.plot(x_pred, y_lin, label="Linear")
+    ax.plot(x_pred, y_lin, label="Linear regression")
     ax.plot(x_pred, y_spline, label="B-spline")
     ax.set(
         xlabel=r"$\epsilon$-similarity",
@@ -297,7 +298,7 @@ def fig_attack_analysis_tail_distribution(dataset_name):
     )
     ax.legend()
     fig.tight_layout()
-    fig.savefig(f"atk_analysis_{dataset_name}_extreme.png", dpi=400)
+    fig.savefig("atk_analysis_enron_extreme.png", dpi=400)
 
 
 def fig_indiv_risk_assessment(col_name):
@@ -330,7 +331,7 @@ def fig_indiv_risk_assessment(col_name):
 
     # Visualization in  the log-log space
     ax.scatter(log_x, log_y, color="black", alpha=0.5, label="Observations")
-    ax.plot(np.log(x_pred), log_y_lin, label="Linear")
+    ax.plot(np.log(x_pred), log_y_lin, label="Linear regression")
     ax.plot(np.log(x_pred), log_y_quant075, label="Quantile 0.75")
     ax.plot(np.log(x_pred), log_y_quant095, label="Quantile 0.95")
     ax.set(
@@ -346,7 +347,7 @@ def fig_indiv_risk_assessment(col_name):
 
     # Visualization in  the standard space
     ax.scatter(x, y, color="black", alpha=0.5, label="Observations")
-    ax.plot(x_pred, y_lin, label="Linear")
+    ax.plot(x_pred, y_lin, label="Linear regression")
     ax.plot(x_pred, y_quant075, label="Quantile 0.75")
     ax.plot(x_pred, y_quant095, label="Quantile 0.95")
     ax.set(
@@ -509,11 +510,9 @@ if __name__ == "__main__":
     fig_epsilon_nb_docs()
 
     fig_attack_analysis("enron")
-    fig_attack_analysis("enron_extreme")
     fig_attack_analysis("apache")
-    fig_attack_analysis("apache_reduced")
     fig_attack_analysis("blogs")
-    fig_attack_analysis("blogs_reduced")
+    fig_attack_analysis_tail_distribution()
     fig_comparison_atk()
 
     fig_indiv_risk_assessment("IHOP Acc")

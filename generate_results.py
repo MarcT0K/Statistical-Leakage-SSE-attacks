@@ -486,7 +486,7 @@ def risk_assessment_countermeasure_tuning():
 ########## UNIFORM SAMPLING EXPERIMENTS ###########""
 
 
-def compute_p_cor(coocc_1, n_1, coocc_2, n_2):
+def compute_p_bc(coocc_1, n_1, coocc_2, n_2):
     assert n_1 > 0 and n_2 > 0
     avg_coocc = (coocc_1 * n_1 + coocc_2 * n_2) / (n_1 + n_2)
     z_stats = (coocc_1 - coocc_2) / np.sqrt(
@@ -494,8 +494,8 @@ def compute_p_cor(coocc_1, n_1, coocc_2, n_2):
     )
     p_values = 2 * scipy.stats.norm.sf(abs(z_stats))
     p_values[np.isnan(p_values)] = 1
-    p_cor = p_values.min() * (p_values.shape[0] * (p_values.shape[0] + 1)) / 2
-    return p_cor
+    p_bc = p_values.min() * (p_values.shape[0] * (p_values.shape[0] + 1)) / 2
+    return p_bc
 
 
 def bonferroni_experiments():
@@ -510,7 +510,7 @@ def bonferroni_experiments():
             "Server voc size",
             "Similarity",
             "Ref Score Acc",
-            "p_cor",
+            "p_bc",
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -545,7 +545,7 @@ def bonferroni_experiments():
             # Compute espilon-similarity
             ind_doc_coocc = ind_mat.T @ ind_mat / ind_mat.shape[0]
             atk_full_coocc = atk_mat.T @ atk_mat / atk_mat.shape[0]
-            p_cor = compute_p_cor(
+            p_bc = compute_p_bc(
                 atk_full_coocc,
                 atk_mat.shape[0],
                 ind_doc_coocc,
@@ -559,7 +559,7 @@ def bonferroni_experiments():
                     "Server voc size": voc_size,
                     "Similarity": epsilon_sim(atk_full_coocc, ind_doc_coocc),
                     "Ref Score Acc": ref_acc,
-                    "p_cor": p_cor,
+                    "p_bc": p_bc,
                 }
             )
 
@@ -574,7 +574,7 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
             "Server voc size",
             "Similarity",
             "Ref Score Acc",
-            "p_cor",
+            "p_bc",
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -609,7 +609,7 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
             coocc_ind = ind_mat.T @ ind_mat / ind_mat.shape[0]
             coocc_atk = atk_mat.T @ atk_mat / atk_mat.shape[0]
 
-            p_cor = compute_p_cor(
+            p_bc = compute_p_bc(
                 coocc_atk,
                 atk_mat.shape[0],
                 coocc_ind,
@@ -624,7 +624,7 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
                     "Server voc size": voc_size,
                     "Similarity": epsilon_sim(coocc_atk, coocc_ind),
                     "Ref Score Acc": ref_acc,
-                    "p_cor": p_cor,
+                    "p_bc": p_bc,
                 }
             )
 
@@ -658,13 +658,11 @@ if __name__ == "__main__":
     fix_randomness(44)
     generate_ref_score_results(enron_extractor, "enron")
     fix_randomness(45)
-    generate_ref_score_results(apache_extractor, "apache")
+    generate_ref_score_results(enron_extractor, "enron_extreme", voc_size=4000)
     fix_randomness(46)
-    generate_ref_score_results(apache_extractor, "apache_reduced", 30000)
+    generate_ref_score_results(apache_extractor, "apache")
     fix_randomness(47)
     generate_ref_score_results(blogs_extractor, "blogs")
-    fix_randomness(48)
-    generate_ref_score_results(blogs_extractor, "blogs_reduced", 30000)
     fix_randomness(49)
     risk_assessment()
     fix_randomness(50)
@@ -675,5 +673,3 @@ if __name__ == "__main__":
     bonferroni_experiments()
     fix_randomness(53)
     bonferroni_experiments_by_year()
-    fix_randomness(54)
-    generate_ref_score_results(enron_extractor, "enron_extreme", voc_size=4000)
