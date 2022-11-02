@@ -1,12 +1,15 @@
 #!/usr/bin/python3
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,logging-fstring-interpolation
 import csv
 import os
 import random
+import logging
 
 import numpy as np
 import scipy
 import tqdm
+
+from codecarbon import OfflineEmissionsTracker
 
 from src.attacks.ihop import IHOPAttacker
 from src.attacks.score import RefinedScoreAttacker, ScoreAttacker
@@ -25,11 +28,14 @@ from src.simulation_utils import (
     simulate_attack,
 )
 
-epsilon_sim = lambda coocc_1, coocc_2: np.linalg.norm(coocc_1 - coocc_2)
-
 VOC_SIZE = 500
 QUERYSET_SIZE = 300
 KNOWN_QUERIES = 15
+
+
+def epsilon_sim(coocc_1, coocc_2):
+    return np.linalg.norm(coocc_1 - coocc_2)
+
 
 ############## ATTACK ANALYSIS EXPERIMENTS ###########
 
@@ -644,32 +650,71 @@ def fix_randomness(seed: int):
     random.seed(seed)
 
 
-# TODO: add a bit of logging?
-if __name__ == "__main__":
-    if not os.path.exists("results"):
-        os.makedirs("results")
-    os.chdir("results")
+class Laboratory:
+    def __init__(self, seed):
+        if not os.path.exists("results"):
+            os.makedirs("results")
+        os.chdir("results")
+        logging.basicConfig(
+            filename="results.log", encoding="utf-8", level=logging.DEBUG
+        )
+        self.random_seed = seed
+        self.tracker = OfflineEmissionsTracker(
+            measure_power_secs=5, country_iso_code="FRA", log_level="error"
+        )
 
-    # Call all functions defined in this file
-    fix_randomness(42)
-    similarity_exploration()
-    fix_randomness(43)
-    atk_comparison()
-    fix_randomness(44)
-    generate_ref_score_results(enron_extractor, "enron")
-    fix_randomness(45)
-    generate_ref_score_results(enron_extractor, "enron_extreme", voc_size=4000)
-    fix_randomness(46)
-    generate_ref_score_results(apache_extractor, "apache")
-    fix_randomness(47)
-    generate_ref_score_results(blogs_extractor, "blogs")
-    fix_randomness(49)
-    risk_assessment()
-    fix_randomness(50)
-    risk_assessment_countermeasure_tuning()
-    fix_randomness(51)
-    risk_assessment_truncated_vocabulary()
-    fix_randomness(52)
-    bonferroni_experiments()
-    fix_randomness(53)
-    bonferroni_experiments_by_year()
+        logging.info("BEGIN EXPERIMENTS")
+        logging.info("=================")
+        self.tracker.start()
+
+    def execute(self, experiment, *args, **kwargs):
+        logging.info(
+            f"BEGIN EXPERIMENT {experiment.__name__} (Args: {args}, Kwargs: {kwargs}"
+        )
+        fix_randomness(self.random_seed)
+
+        # Pre-experiment carbon measure
+        begin_emission = self.tracker.flush()
+        begin_energy = self.tracker._total_energy
+
+        experiment(*args, **kwargs)
+
+        # Post-experiment carbon measure
+        end_emission = self.tracker.flush()
+        end_energy = self.tracker._total_energy
+        logging.info(f"END EXPERIMENT {experiment.__name__}")
+        logging.info(
+            f"Carbon footprint: {end_emission - begin_emission} KgCO2e (Total: {end_emission} KgCO2e)"
+        )
+        logging.info(
+            f"Energy consumption: {end_energy - begin_energy} KWh (Total: {end_energy} KWh)"
+        )
+        logging.info("----------------")
+        self.random_seed += 1
+
+    def end(self):
+        logging.info("===============")
+        logging.info("END EXPERIMENTS")
+        emissions = self.tracker.stop()
+        energy = self.tracker._total_energy
+        logging.info(f"Total carbon footprint: {emissions} KgCO2e")
+        logging.info(f"Energy consumption: {energy} KWh")
+
+
+if __name__ == "__main__":
+    lab = Laboratory(42)
+
+    lab.execute(similarity_exploration)
+    lab.execute(atk_comparison)
+    lab.execute(generate_ref_score_results, enron_extractor, "enron")
+    lab.execute(
+        generate_ref_score_results, enron_extractor, "enron_extreme", voc_size=4000
+    )
+    lab.execute(generate_ref_score_results, apache_extractor, "apache")
+    lab.execute(generate_ref_score_results, blogs_extractor, "blogs")
+    lab.execute(risk_assessment)
+    lab.execute(risk_assessment_countermeasure_tuning)
+    lab.execute(risk_assessment_truncated_vocabulary)
+    lab.execute(bonferroni_experiments)
+    lab.execute(bonferroni_experiments_by_year)
+    lab.end()

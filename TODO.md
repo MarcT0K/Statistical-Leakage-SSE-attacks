@@ -3,6 +3,5 @@
 - Double check the results for Bonferroni by year
 - Globally test the randomness fix
 - Relaunch Bloggers experiment with a more powerful server (and then with as many documents as possible)
-- Add docstrings on the result and figure scripts
-- [FOR FINAL VERSION] Add docstrings to state which scripts is associated to which figure in the paper.
 - [FOR FINAL VERSION] Relaunch all experiments with correct randomness (and regenerate the plots)
+- [FOR CODE SOURCE PUBLICATION] Add docstrings to state which scripts is associated to which figure in the paper.
