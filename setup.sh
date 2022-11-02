@@ -1,10 +1,7 @@
 #!/bin/bash
 set -e
 
-# Install GraphM
-cd graphm-fixed
-./graphm_install
-cd ..
+sudo apt install python3 python3-pip wget
 
 pip3 install -r requirements.txt
 
