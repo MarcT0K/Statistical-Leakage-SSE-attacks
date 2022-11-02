@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 # pylint: disable=invalid-name,logging-fstring-interpolation
 import csv
+import logging
 import os
 import random
-import logging
 
 import numpy as np
 import scipy
@@ -13,7 +13,7 @@ from codecarbon import OfflineEmissionsTracker
 
 from src.attacks.ihop import IHOPAttacker
 from src.attacks.score import RefinedScoreAttacker, ScoreAttacker
-from src.keyword_extract import KeywordExtractor, compute_occ_mat
+from src.keyword_extract import KeywordExtractor
 from src.document_extraction import (
     apache_extractor,
     blogs_extractor,
@@ -591,7 +591,10 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
 
             real_extractor = KeywordExtractor(ind_docs, voc_size)
             ind_mat = real_extractor.occ_array
-            atk_mat = compute_occ_mat(atk_docs, real_extractor.sorted_voc_with_occ)
+            atk_mat = KeywordExtractor(
+                atk_docs,
+                fixed_sorted_voc=real_extractor.sorted_voc_with_occ,  # Vocabulary reused
+            )
 
             voc = list(real_extractor.get_sorted_voc())
             queries_ind = np.random.choice(len(voc), QUERYSET_SIZE, replace=False)
@@ -652,23 +655,31 @@ def fix_randomness(seed: int):
 
 class Laboratory:
     def __init__(self, seed):
+        self.random_seed = seed
+
+        # Setup result directory
         if not os.path.exists("results"):
             os.makedirs("results")
         os.chdir("results")
-        logging.basicConfig(
-            filename="results.log", encoding="utf-8", level=logging.DEBUG
-        )
-        self.random_seed = seed
+
+        # Setup logger
+        self.logger = logging.getLogger("experiments_carbon")
+        self.logger.setLevel(logging.DEBUG)
+        fh = logging.FileHandler("spam.log")
+        fh.setLevel(logging.DEBUG)
+        self.logger.addHandler(fh)
+
+        # Setup carbon tracker
         self.tracker = OfflineEmissionsTracker(
             measure_power_secs=5, country_iso_code="FRA", log_level="error"
         )
-
-        logging.info("BEGIN EXPERIMENTS")
-        logging.info("=================")
         self.tracker.start()
 
+        self.logger.info("BEGIN EXPERIMENTS")
+        self.logger.info("=================")
+
     def execute(self, experiment, *args, **kwargs):
-        logging.info(
+        self.logger.info(
             f"BEGIN EXPERIMENT {experiment.__name__} (Args: {args}, Kwargs: {kwargs}"
         )
         fix_randomness(self.random_seed)
@@ -682,23 +693,23 @@ class Laboratory:
         # Post-experiment carbon measure
         end_emission = self.tracker.flush()
         end_energy = self.tracker._total_energy
-        logging.info(f"END EXPERIMENT {experiment.__name__}")
-        logging.info(
+        self.logger.info(f"END EXPERIMENT {experiment.__name__}")
+        self.logger.info(
             f"Carbon footprint: {end_emission - begin_emission} KgCO2e (Total: {end_emission} KgCO2e)"
         )
-        logging.info(
+        self.logger.info(
             f"Energy consumption: {end_energy - begin_energy} KWh (Total: {end_energy} KWh)"
         )
-        logging.info("----------------")
+        self.logger.info("----------------")
         self.random_seed += 1
 
     def end(self):
-        logging.info("===============")
-        logging.info("END EXPERIMENTS")
+        self.logger.info("===============")
+        self.logger.info("END EXPERIMENTS")
         emissions = self.tracker.stop()
         energy = self.tracker._total_energy
-        logging.info(f"Total carbon footprint: {emissions} KgCO2e")
-        logging.info(f"Energy consumption: {energy} KWh")
+        self.logger.info(f"Total carbon footprint: {emissions} KgCO2e")
+        self.logger.info(f"Energy consumption: {energy} KWh")
 
 
 if __name__ == "__main__":

@@ -30,26 +30,10 @@ class OccRowComputer:
         return [int(voc_word in word_list) for voc_word in self.voc]
 
 
-def compute_occ_mat(corpus_df, sorted_voc_with_occ):
-    freq_dict = {}
-    # Word tokenization
-    nb_cores = multiprocessing.cpu_count()
-    with poolcontext(processes=nb_cores) as pool:
-        results = pool.starmap(
-            KeywordExtractor.extract_email_voc,
-            enumerate(np.array_split(corpus_df, nb_cores)),
-        )
-        freq_dict, _ = reduce(KeywordExtractor._merge_results, results)
-
-    return KeywordExtractor.build_occurrence_array(
-        sorted_voc_with_occ=sorted_voc_with_occ, freq_dict=freq_dict
-    )
-
-
 class KeywordExtractor:
-    """Class to extract the keyword from a corpus/email set"""
+    """Class to extract keywords from a corpus/email set"""
 
-    def __init__(self, corpus_df, voc_size=100):
+    def __init__(self, corpus_df, voc_size=100, fixed_sorted_voc=None):
         glob_freq_dict = {}
         freq_dict = {}
         # Word tokenization
@@ -82,9 +66,15 @@ class KeywordExtractor:
         del glob_freq_list
 
         # Creation of the occurrence matrix
-        self.occ_array = self.build_occurrence_array(
-            sorted_voc_with_occ=self.sorted_voc_with_occ, freq_dict=freq_dict
-        )
+        if fixed_sorted_voc is None:
+            self.occ_array = self.build_occurrence_array(
+                sorted_voc_with_occ=self.sorted_voc_with_occ, freq_dict=freq_dict
+            )
+        else:
+            self.occ_array = self.build_occurrence_array(
+                sorted_voc_with_occ=fixed_sorted_voc, freq_dict=freq_dict
+            )
+
         if not self.occ_array.any():
             raise ValueError("occurrence array is empty")
 
