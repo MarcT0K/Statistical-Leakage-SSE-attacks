@@ -585,7 +585,7 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for (i, year_split) in enumerate([2003, 2005, 2007, 2009]):
-            print(f"Experiment {i+1} out of {len([2003, 2005, 2007, 2009])}")
+            print(f"Experiment {i+1} out of 4")
             ind_docs = extract_apache_ml_by_year(to_year=year_split)
             atk_docs = extract_apache_ml_by_year(from_year=year_split)
 
@@ -665,7 +665,7 @@ class Laboratory:
         # Setup logger
         self.logger = logging.getLogger("experiments_carbon")
         self.logger.setLevel(logging.DEBUG)
-        fh = logging.FileHandler("spam.log")
+        fh = logging.FileHandler("experiments_carbon.log")
         fh.setLevel(logging.DEBUG)
         self.logger.addHandler(fh)
 
@@ -680,7 +680,7 @@ class Laboratory:
 
     def execute(self, experiment, *args, **kwargs):
         self.logger.info(
-            f"BEGIN EXPERIMENT {experiment.__name__} (Args: {args}, Kwargs: {kwargs}"
+            f"BEGIN EXPERIMENT {experiment.__name__} (Args: {args}, Kwargs: {kwargs})"
         )
         fix_randomness(self.random_seed)
 
