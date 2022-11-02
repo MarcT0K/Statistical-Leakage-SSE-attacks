@@ -594,7 +594,7 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
             atk_mat = KeywordExtractor(
                 atk_docs,
                 fixed_sorted_voc=real_extractor.sorted_voc_with_occ,  # Vocabulary reused
-            )
+            ).occ_array
 
             voc = list(real_extractor.get_sorted_voc())
             queries_ind = np.random.choice(len(voc), QUERYSET_SIZE, replace=False)
