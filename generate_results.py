@@ -666,8 +666,10 @@ class Laboratory:
         self.logger = logging.getLogger("experiments_carbon")
         self.logger.setLevel(logging.DEBUG)
         fh = logging.FileHandler("experiments_carbon.log")
-        fh.setLevel(logging.DEBUG)
         self.logger.addHandler(fh)
+        sh = logging.StreamHandler()
+        self.logger.addHandler(sh)
+        self.logger.setLevel(logging.DEBUG)
 
         # Setup carbon tracker
         self.tracker = OfflineEmissionsTracker(
