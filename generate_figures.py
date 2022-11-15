@@ -106,11 +106,13 @@ QUANTILE = 0.95
 
 
 def data_to_xy(dataframe, col_name):
-    x = np.log(1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"])
-    y = logit(dataframe[col_name])
+    col = dataframe[col_name]
+    mask = np.logical_and(col != 0, col != 1.0)  # To avoid a warning on the logit
+    assert sum(~mask) < 1 / 3 * col.shape[0]
 
-    mask = abs(y) != np.inf
-    assert sum(~mask) < 1 / 3 * y.shape[0]  # To avoid removing too many points
+    x = np.log(1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"])
+    x = x[mask]
+    y = logit(col[mask])
 
     y = y[mask].to_numpy()
     x = x[mask].to_numpy()
@@ -134,7 +136,7 @@ def fig_attack_analysis(dataset_name):
     x = dataframe["Epsilon"]
     y = dataframe["Refined Score Acc"]
 
-    mask = y != 0
+    mask = np.logical_and(y != 0, y != 1.0)
     assert sum(~mask) < 1 / 3 * y.shape[0]
     y = y[mask]
     x = x[mask]
@@ -244,7 +246,7 @@ def fig_attack_analysis_tail_distribution():
     x = dataframe["Epsilon"]
     y = dataframe["Refined Score Acc"]
 
-    mask = y != 0
+    mask = np.logical_and(y != 0, y != 1.0)
     assert sum(~mask) < 1 / 3 * y.shape[0]
     y = y[mask]
     x = x[mask]
@@ -461,7 +463,7 @@ def lambda_risk_acc_to_document_size(col_name, n_atk_max=None):
     # Compute the prediction
     quant095_slope, quant095_intercept = data_to_quant_reg(dataframe, col_name)
 
-    # Remainder logit(acc) = intercept * log(1/natk + 1/nind) + slope
+    # Reminder logit(acc) = intercept * log(1/natk + 1/nind) + slope
     if n_atk_max is None:
         func = lambda acc_threshold: 1 / np.exp(
             (logit(acc_threshold) - quant095_intercept) / quant095_slope
@@ -498,7 +500,79 @@ def tab_risk_assess_conclusions():
         )
     res = np.floor(np.array(res).T)
     res[res <= 0] = np.inf
-    return res
+    int_to_str = lambda nbr: str(int(nbr)) if nbr != np.inf else r"\infty"
+
+    print(r"\begin{tabular}{|c|c|c|c|c|}\hline")
+    print(r"Accuracy max. (\%) & 5 & 10 & 20 & 50 \\\hline")
+    for ind, n_atk in enumerate([200, 500, 1000]):
+        print(
+            r"When $n_{atk} \le "
+            + int_to_str(n_atk)
+            + r", n_\text{ind} \le$ & $"
+            + int_to_str(res[ind, 0])
+            + r"$ & $"
+            + int_to_str(res[ind, 1])
+            + r"$ & $"
+            + int_to_str(res[ind, 2])
+            + r"$ & $"
+            + int_to_str(res[ind, 3])
+            + r"$ \\"
+        )
+    print(
+        r"When $n_{atk} \rightarrow \infty, n_\text{ind} \le$ & $"
+        + int_to_str(res[3, 0])
+        + r"$ & $"
+        + int_to_str(res[3, 1])
+        + r"$ & $"
+        + int_to_str(res[3, 2])
+        + r"$ & $"
+        + int_to_str(res[3, 3])
+        + r"$ \\\hline"
+    )
+    print(r"\end{tabular}")
+
+
+def tab_bonferroni_per_year():
+    dataframe = pd.read_csv("bonferroni_tests_by_year.csv")
+    print(r"\begin{tabular}{|c|c|c|c|c|}\hline")
+    print(
+        f'Year split & {dataframe["Year split"][0]} & {dataframe["Year split"][1]} & {dataframe["Year split"][2]} & {dataframe["Year split"][3]}'
+        + r"\\\hline"
+    )
+    print(
+        r"$\widetilde{pv}$ "
+        + f' & {dataframe["p_bc"][0]} & {dataframe["p_bc"][1]} & {dataframe["p_bc"][2]} & {dataframe["p_bc"][3]}'
+        + r"\\\hline"
+    )
+    print(r"\end{tabular}")
+
+
+def tab_bonferroni_uniform_sampling():
+    dataframe = pd.read_csv("bonferroni_tests.csv")
+
+    print(r"\begin{tabular}{|c|c|c|c|}\hline")
+    print(
+        r"Avg. $\widetilde{pv}$ & Min. $\widetilde{p}$ & $Q_{\widetilde{p}}(0.1)$\tablefootnote{Remainder: $Q_{X}(\alpha)$ is the quantile of level $\alpha$ for the data distribution $X$.} & $Q_{\widetilde{p}}(0.5)$ \\\hline"
+    )
+    print(
+        +f"{dataframe['p_bc'].mean():.2f} & {dataframe['p_bc'].min():.2f} & {dataframe['p_bc'].quantile(0.1):.2f} & {dataframe['p_bc'].quantile(0.5):.2f}"
+        + r"\\ \hline"
+    )
+    print(r"\end{tabular}")
+
+
+def draw_figure(fig_function, *args):
+    print(f"Drawing figure: {fig_function.__name__} (Args: {args})...", end="")
+    fig_function(*args)
+    print("OK")
+
+
+def print_tabular(tab_function, *args):
+    print(
+        f"Preparing table: {tab_function.__name__} (Args: {args})... Copy the LaTeX code below:"
+    )
+    tab_function(*args)
+    input("...OK\nPress enter when you are done.")
 
 
 if __name__ == "__main__":
@@ -506,16 +580,19 @@ if __name__ == "__main__":
         raise OSError("No result directory found.")
     os.chdir("results")
 
-    # Call all functions defined in this file
-    fig_epsilon_nb_docs()
+    draw_figure(fig_epsilon_nb_docs)
+    draw_figure(fig_attack_analysis, "enron")
+    draw_figure(fig_attack_analysis, "apache")
+    draw_figure(fig_attack_analysis, "blogs")
+    draw_figure(fig_attack_analysis_tail_distribution)
+    draw_figure(fig_comparison_atk)
+    draw_figure(fig_indiv_risk_assessment, "IHOP Acc")
+    draw_figure(fig_indiv_risk_assessment, "Refined Score Acc")
+    draw_figure(fig_indiv_risk_assessment, "Score Acc")
+    draw_figure(fig_comp_risk_assessment)
+    draw_figure(fig_comp_countermeasure_tuning)
+    draw_figure(fig_comp_parameter_tuning)
 
-    fig_attack_analysis("enron")
-    fig_attack_analysis("apache")
-    fig_attack_analysis("blogs")
-    fig_attack_analysis_tail_distribution()
-    fig_comparison_atk()
-
-    fig_indiv_risk_assessment("IHOP Acc")
-    fig_indiv_risk_assessment("Refined Score Acc")
-    fig_indiv_risk_assessment("Score Acc")
-    fig_comp_risk_assessment()
+    print_tabular(tab_risk_assess_conclusions)
+    print_tabular(tab_bonferroni_per_year)
+    print_tabular(tab_bonferroni_uniform_sampling)

@@ -682,19 +682,19 @@ class Laboratory:
 
     def execute(self, experiment, *args, **kwargs):
         self.logger.info(
-            f"BEGIN EXPERIMENT {experiment.__name__} (Args: {args}, Kwargs: {kwargs})"
+            f"BEGIN EXPERIMENT {experiment.__name__} (Args: {args}, Kwargs: {kwargs}, Random seed: {self.random_seed})"
         )
         fix_randomness(self.random_seed)
 
         # Pre-experiment carbon measure
         begin_emission = self.tracker.flush()
-        begin_energy = self.tracker._total_energy
+        begin_energy = self.tracker._total_energy.kWh
 
         experiment(*args, **kwargs)
 
         # Post-experiment carbon measure
         end_emission = self.tracker.flush()
-        end_energy = self.tracker._total_energy
+        end_energy = self.tracker._total_energy.kWh
         self.logger.info(f"END EXPERIMENT {experiment.__name__}")
         self.logger.info(
             f"Carbon footprint: {end_emission - begin_emission} KgCO2e (Total: {end_emission} KgCO2e)"
@@ -709,7 +709,7 @@ class Laboratory:
         self.logger.info("===============")
         self.logger.info("END EXPERIMENTS")
         emissions = self.tracker.stop()
-        energy = self.tracker._total_energy
+        energy = self.tracker._total_energy.kWh
         self.logger.info(f"Total carbon footprint: {emissions} KgCO2e")
         self.logger.info(f"Energy consumption: {energy} KWh")
 

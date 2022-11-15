@@ -24,3 +24,5 @@ wget https://web.archive.org/web/20200121222642/http://u.cs.biu.ac.il/~koppel/bl
 unzip blogs.zip
 rm blogs.zip
 
+# Dependencies for the figures
+sudo apt install texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
