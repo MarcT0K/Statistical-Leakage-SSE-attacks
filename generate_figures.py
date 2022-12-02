@@ -60,7 +60,7 @@ def fig_epsilon_nb_docs():
     plt.cla()
 
     mask = arr[:, 0] == 2022  # n_atk fixed
-    x = 1 / arr[mask, 1]
+    x = np.sqrt(1 / arr[mask, 1])
     y = arr[mask, 2]
     slope, intercept = np.polyfit(x, y, 1)
     ax.scatter(x, y, color="black", alpha=0.5, label="Observations")
@@ -70,7 +70,7 @@ def fig_epsilon_nb_docs():
         label=r"Linear reg. ($y = bx + a$)",
     )
     ax.set(
-        xlabel=r"$\frac{1}{n_{ind}}$, Fixed $n_{atk}$=2K",
+        xlabel=r"$\sqrt{\frac{1}{n_{ind}}}$, Fixed $n_{atk}$=2K",
         ylabel=r"$\epsilon$-similarity",
     )
     ax.plot([], [], " ", label=rf"$b={slope:.2f}$ / $a={intercept:.3f}$")
@@ -80,7 +80,7 @@ def fig_epsilon_nb_docs():
     plt.cla()
 
     mask = arr[:, 1] == 1820  # n_ind fixed
-    x = 1 / arr[mask, 0]
+    x = np.sqrt(1 / arr[mask, 0])
     y = arr[mask, 2]
     slope, intercept = np.polyfit(x, y, 1)
     ax.scatter(x, y, color="black", alpha=0.5, label="Observations")
@@ -91,7 +91,7 @@ def fig_epsilon_nb_docs():
     )
     ax.plot([], [], " ", label=rf"$b={slope:.2f}$ / $a={intercept:.3f}$")
     ax.set(
-        xlabel=r"$\frac{1}{n_{atk}}$, Fixed $n_{ind}$=1.8K",
+        xlabel=r"$\sqrt{\frac{1}{n_{atk}}}$, Fixed $n_{ind}$=1.8K",
         ylabel=r"$\epsilon$-similarity",
     )
     ax.legend()
