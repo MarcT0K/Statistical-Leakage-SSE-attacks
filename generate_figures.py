@@ -536,7 +536,7 @@ def tab_bonferroni_per_year():
     dataframe = pd.read_csv("bonferroni_tests_by_year.csv")
     print(r"\begin{tabular}{|c|c|c|c|c|}\hline")
     print(
-        f'Year split & {dataframe["Year split"][0]} & {dataframe["Year split"][1]} & {dataframe["Year split"][2]} & {dataframe["Year split"][3]}'
+        f'Year & {dataframe["Year split"][0]} & {dataframe["Year split"][1]} & {dataframe["Year split"][2]} & {dataframe["Year split"][3]}'
         + r"\\\hline"
     )
     print(
@@ -552,10 +552,48 @@ def tab_bonferroni_uniform_sampling():
 
     print(r"\begin{tabular}{|c|c|c|c|}\hline")
     print(
-        r"Avg. $\widetilde{pv}$ & Min. $\widetilde{p}$ & $Q_{\widetilde{p}}(0.1)$\tablefootnote{Remainder: $Q_{X}(\alpha)$ is the quantile of level $\alpha$ for the data distribution $X$.} & $Q_{\widetilde{p}}(0.5)$ \\\hline"
+        r"Avg. $\widetilde{pv}$ & Min. $\widetilde{p}$ & $Q_{\widetilde{p}}(0.1)$ & $Q_{\widetilde{p}}(0.5)$ \\\hline"
     )
     print(
         +f"{dataframe['p_bc'].mean():.2f} & {dataframe['p_bc'].min():.2f} & {dataframe['p_bc'].quantile(0.1):.2f} & {dataframe['p_bc'].quantile(0.5):.2f}"
+        + r"\\ \hline"
+    )
+    print(r"\end{tabular}")
+
+
+def tab_bonferroni_per_year_acc():
+    dataframe = pd.read_csv("bonferroni_tests_by_year.csv")
+    print(r"\begin{tabular}{|c|c|c|c|c|}\hline")
+    print(
+        f'Year & {dataframe["Year split"][0]} & {dataframe["Year split"][1]} & {dataframe["Year split"][2]} & {dataframe["Year split"][3]}'
+        + r"\\\hline"
+    )
+    print(
+        r"$\epsilon$-similarity &"
+        + f' & {dataframe["Similarity"][0]:.2f} & {dataframe["Similarity"][1]:.2f} & {dataframe["Similarity"][2]:.2f} & {dataframe["Similarity"][3]:.2f}'
+        + r"\\\hline"
+    )
+    print(
+        r"Ref. Score acc. (\%) &"
+        + f' & {dataframe["Ref Score Acc"][0]*100:.2f} & {dataframe["Ref Score Acc"][1]*100:.2f} & {dataframe["Ref Score Acc"][2]*100:.2f} & {dataframe["Ref Score Acc"][3]*100:.2f}'
+        + r"\\\hline"
+    )
+    print(r"\end{tabular}")
+
+
+def tab_bonferroni_uniform_sampling_acc():
+    dataframe = pd.read_csv("bonferroni_tests.csv")
+
+    print(r"\begin{tabular}{|c|c|c|c|c|}\hline")
+    print(r"& Average & Minimum & Quantile 0.1 & Quantile 0.5 \\\hline")
+    print(
+        r"$\epsilon$-similarity &"
+        + f"{dataframe['Similarity'].mean():.2f} & {dataframe['Similarity'].min():.2f} & {dataframe['Similarity'].quantile(0.1):.2f} & {dataframe['Similarity'].quantile(0.5):.2f}"
+        + r"\\ \hline"
+    )
+    print(
+        r"Ref. Score. acc. (\%) &"
+        + f"{dataframe['Ref Score Acc'].mean():.2f} & {dataframe['Ref Score Acc'].min():.2f} & {dataframe['Ref Score Acc'].quantile(0.1):.2f} & {dataframe['Ref Score Acc'].quantile(0.5):.2f}"
         + r"\\ \hline"
     )
     print(r"\end{tabular}")
@@ -573,6 +611,36 @@ def print_tabular(tab_function, *args):
     )
     tab_function(*args)
     input("...OK\nPress enter when you are done.")
+
+
+def temp_fig():
+    fig, ax = plt.subplots()
+    dataframe = pd.read_csv("risk_assessment.csv")
+
+    x = 1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"]
+    y = dataframe["IHOP Acc"]
+    step_size = x.max() / 500
+    x_pred = np.arange((1 / dataframe["Nb similar docs"]).min(), x.max(), step_size)
+
+    quant095_slope, quant095_intercept = data_to_quant_reg(dataframe, "IHOP Acc")
+    log_y_quant095 = quant095_slope * np.log(x_pred) + quant095_intercept
+    y_quant095 = posit(log_y_quant095)
+
+    x_ind_docs = dataframe["Nb server docs"]
+
+    # Visualization in  the standard space
+    ax.scatter(
+        x_ind_docs, y, color="black", alpha=0.5, label="Attack simulation results"
+    )
+    ax.plot(1 / x_pred, y_quant095, label="Estimated accuracy upper bound")
+    ax.set(
+        xlabel=r"Number of indexed documents $n_\mathrm{ind}$",
+        ylabel="Accuracy",
+    )
+    ax.legend()
+    plt.xlim([0, 7500])
+    fig.tight_layout()
+    fig.savefig("risk_IHOP.png", dpi=400, transparent=True)
 
 
 if __name__ == "__main__":
@@ -596,3 +664,5 @@ if __name__ == "__main__":
     print_tabular(tab_risk_assess_conclusions)
     print_tabular(tab_bonferroni_per_year)
     print_tabular(tab_bonferroni_uniform_sampling)
+    print_tabular(tab_bonferroni_per_year_acc)
+    print_tabular(tab_bonferroni_uniform_sampling_acc)
