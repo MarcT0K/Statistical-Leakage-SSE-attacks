@@ -457,79 +457,42 @@ def fig_comp_parameter_tuning():
     fig.savefig("parameter_tuning_comparison.png", dpi=400)
 
 
-def lambda_risk_acc_to_document_size(col_name, n_atk_max=None):
+def fig_maximum_index_size():
+    fig, ax = plt.subplots()
     dataframe = pd.read_csv("risk_assessment.csv")
 
-    # Compute the prediction
-    quant095_slope, quant095_intercept = data_to_quant_reg(dataframe, col_name)
+    x = 1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"]
+    y = dataframe["IHOP Acc"]
+    step_size = x.max() / 500
+    x_pred = np.arange((1 / dataframe["Nb similar docs"]).min(), x.max(), step_size)
 
-    # Reminder logit(acc) = intercept * log(1/natk + 1/nind) + slope
-    if n_atk_max is None:
-        func = lambda acc_threshold: 1 / np.exp(
-            (logit(acc_threshold) - quant095_intercept) / quant095_slope
-        )
-    else:
-        func = lambda acc_threshold: 1 / (
-            np.exp((logit(acc_threshold) - quant095_intercept) / quant095_slope)
-            - 1 / n_atk_max
-        )
-    return func
-
-
-def tab_risk_assess_conclusions():
-    risk_inversion_func = lambda_risk_acc_to_document_size("IHOP Acc")
-    risk_inversion_func_fixed_atk_200 = lambda_risk_acc_to_document_size(
-        "IHOP Acc", 200
+    quant095_slope, quant095_intercept = data_to_quant_reg(dataframe, "IHOP Acc")
+    y_quant095_inf_atk = posit(quant095_slope * np.log(x_pred) + quant095_intercept)
+    y_quant095_200_atk = posit(
+        quant095_slope * np.log(x_pred + 1 / 200) + quant095_intercept
     )
-    risk_inversion_func_fixed_atk_500 = lambda_risk_acc_to_document_size(
-        "IHOP Acc", 500
+    y_quant095_500_atk = posit(
+        quant095_slope * np.log(x_pred + 1 / 500) + quant095_intercept
     )
-    risk_inversion_func_fixed_atk_1000 = lambda_risk_acc_to_document_size(
-        "IHOP Acc", 1000
+    y_quant095_1000_atk = posit(
+        quant095_slope * np.log(x_pred + 1 / 1000) + quant095_intercept
     )
 
-    res = []
-    for acc in [0.05, 0.1, 0.2, 0.5]:
-        res.append(
-            (
-                risk_inversion_func_fixed_atk_200(acc),
-                risk_inversion_func_fixed_atk_500(acc),
-                risk_inversion_func_fixed_atk_1000(acc),
-                risk_inversion_func(acc),
-            )
-        )
-    res = np.floor(np.array(res).T)
-    res[res <= 0] = np.inf
-    int_to_str = lambda nbr: str(int(nbr)) if nbr != np.inf else r"\infty"
-
-    print(r"\begin{tabular}{|c|c|c|c|c|}\hline")
-    print(r"Accuracy max. (\%) & 5 & 10 & 20 & 50 \\\hline")
-    for ind, n_atk in enumerate([200, 500, 1000]):
-        print(
-            r"When $n_{atk} \le "
-            + int_to_str(n_atk)
-            + r", n_\text{ind} \le$ & $"
-            + int_to_str(res[ind, 0])
-            + r"$ & $"
-            + int_to_str(res[ind, 1])
-            + r"$ & $"
-            + int_to_str(res[ind, 2])
-            + r"$ & $"
-            + int_to_str(res[ind, 3])
-            + r"$ \\"
-        )
-    print(
-        r"When $n_{atk} \rightarrow \infty, n_\text{ind} \le$ & $"
-        + int_to_str(res[3, 0])
-        + r"$ & $"
-        + int_to_str(res[3, 1])
-        + r"$ & $"
-        + int_to_str(res[3, 2])
-        + r"$ & $"
-        + int_to_str(res[3, 3])
-        + r"$ \\\hline"
+    ax.plot(
+        1 / x_pred, y_quant095_inf_atk, label=r"$n_\mathrm{atk} \rightarrow \infty$"
     )
-    print(r"\end{tabular}")
+    ax.plot(1 / x_pred, y_quant095_1000_atk, label=r"$n_\mathrm{atk} \le 1000$")
+    ax.plot(1 / x_pred, y_quant095_500_atk, label=r"$n_\mathrm{atk} \le 500$")
+    ax.plot(1 / x_pred, y_quant095_200_atk, label=r"$n_\mathrm{atk} \le 200$")
+
+    ax.set(
+        xlabel=r"Maximum index size $n_\mathrm{max}$",
+        ylabel="Maximum accuracy",
+    )
+    ax.legend()
+    plt.xlim([0, 7500])
+    fig.tight_layout()
+    fig.savefig("max_index_size_IHOP.png", dpi=400, transparent=True)
 
 
 def tab_bonferroni_per_year():
@@ -551,11 +514,10 @@ def tab_bonferroni_uniform_sampling():
     dataframe = pd.read_csv("bonferroni_tests.csv")
 
     print(r"\begin{tabular}{|c|c|c|c|}\hline")
+    print(r"& Avg. & Min. & Max. \\\hline")
     print(
-        r"Avg. $\widetilde{pv}$ & Min. $\widetilde{p}$ & $Q_{\widetilde{p}}(0.1)$ & $Q_{\widetilde{p}}(0.5)$ \\\hline"
-    )
-    print(
-        +f"{dataframe['p_bc'].mean():.2f} & {dataframe['p_bc'].min():.2f} & {dataframe['p_bc'].quantile(0.1):.2f} & {dataframe['p_bc'].quantile(0.5):.2f}"
+        r"$\widetilde{pv}$ &"
+        + f"{dataframe['p_bc'].mean():.2f} & {dataframe['p_bc'].min():.2f} & {dataframe['p_bc'].max():.2f}"
         + r"\\ \hline"
     )
     print(r"\end{tabular}")
@@ -569,12 +531,12 @@ def tab_bonferroni_per_year_acc():
         + r"\\\hline"
     )
     print(
-        r"$\epsilon$-similarity &"
+        r"$\epsilon$-similarity"
         + f' & {dataframe["Similarity"][0]:.2f} & {dataframe["Similarity"][1]:.2f} & {dataframe["Similarity"][2]:.2f} & {dataframe["Similarity"][3]:.2f}'
         + r"\\\hline"
     )
     print(
-        r"Ref. Score acc. (\%) &"
+        r"Attack acc. (\%)"
         + f' & {dataframe["Ref Score Acc"][0]*100:.2f} & {dataframe["Ref Score Acc"][1]*100:.2f} & {dataframe["Ref Score Acc"][2]*100:.2f} & {dataframe["Ref Score Acc"][3]*100:.2f}'
         + r"\\\hline"
     )
@@ -584,16 +546,16 @@ def tab_bonferroni_per_year_acc():
 def tab_bonferroni_uniform_sampling_acc():
     dataframe = pd.read_csv("bonferroni_tests.csv")
 
-    print(r"\begin{tabular}{|c|c|c|c|c|}\hline")
-    print(r"& Average & Minimum & Quantile 0.1 & Quantile 0.5 \\\hline")
+    print(r"\begin{tabular}{|c|c|c|c|}\hline")
+    print(r"& Average & Min. & Max. \\\hline")
     print(
         r"$\epsilon$-similarity &"
-        + f"{dataframe['Similarity'].mean():.2f} & {dataframe['Similarity'].min():.2f} & {dataframe['Similarity'].quantile(0.1):.2f} & {dataframe['Similarity'].quantile(0.5):.2f}"
+        + f"{dataframe['Similarity'].mean():.2f} & {dataframe['Similarity'].min():.2f} & {dataframe['Similarity'].max():.2f} "
         + r"\\ \hline"
     )
     print(
-        r"Ref. Score. acc. (\%) &"
-        + f"{dataframe['Ref Score Acc'].mean():.2f} & {dataframe['Ref Score Acc'].min():.2f} & {dataframe['Ref Score Acc'].quantile(0.1):.2f} & {dataframe['Ref Score Acc'].quantile(0.5):.2f}"
+        r"Attack acc. (\%) &"
+        + f"{dataframe['Ref Score Acc'].mean()*100:.2f} & {dataframe['Ref Score Acc'].min()*100:.2f} & {dataframe['Ref Score Acc'].max()*100:.2f}"
         + r"\\ \hline"
     )
     print(r"\end{tabular}")
@@ -613,56 +575,27 @@ def print_tabular(tab_function, *args):
     input("...OK\nPress enter when you are done.")
 
 
-def temp_fig():
-    fig, ax = plt.subplots()
-    dataframe = pd.read_csv("risk_assessment.csv")
-
-    x = 1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"]
-    y = dataframe["IHOP Acc"]
-    step_size = x.max() / 500
-    x_pred = np.arange((1 / dataframe["Nb similar docs"]).min(), x.max(), step_size)
-
-    quant095_slope, quant095_intercept = data_to_quant_reg(dataframe, "IHOP Acc")
-    log_y_quant095 = quant095_slope * np.log(x_pred) + quant095_intercept
-    y_quant095 = posit(log_y_quant095)
-
-    x_ind_docs = dataframe["Nb server docs"]
-
-    # Visualization in  the standard space
-    ax.scatter(
-        x_ind_docs, y, color="black", alpha=0.5, label="Attack simulation results"
-    )
-    ax.plot(1 / x_pred, y_quant095, label="Estimated accuracy upper bound")
-    ax.set(
-        xlabel=r"Number of indexed documents $n_\mathrm{ind}$",
-        ylabel="Accuracy",
-    )
-    ax.legend()
-    plt.xlim([0, 7500])
-    fig.tight_layout()
-    fig.savefig("risk_IHOP.png", dpi=400, transparent=True)
-
-
 if __name__ == "__main__":
     if not os.path.exists("results"):
         raise OSError("No result directory found.")
     os.chdir("results")
 
-    draw_figure(fig_epsilon_nb_docs)
-    draw_figure(fig_attack_analysis, "enron")
-    draw_figure(fig_attack_analysis, "apache")
-    draw_figure(fig_attack_analysis, "blogs")
-    draw_figure(fig_attack_analysis_tail_distribution)
-    draw_figure(fig_comparison_atk)
-    draw_figure(fig_indiv_risk_assessment, "IHOP Acc")
-    draw_figure(fig_indiv_risk_assessment, "Refined Score Acc")
-    draw_figure(fig_indiv_risk_assessment, "Score Acc")
-    draw_figure(fig_comp_risk_assessment)
-    draw_figure(fig_comp_countermeasure_tuning)
-    draw_figure(fig_comp_parameter_tuning)
+    # draw_figure(fig_epsilon_nb_docs)
+    # draw_figure(fig_attack_analysis, "enron")
+    # draw_figure(fig_attack_analysis, "apache")
+    # draw_figure(fig_attack_analysis, "blogs")
+    # draw_figure(fig_attack_analysis_tail_distribution)
+    # draw_figure(fig_comparison_atk)
+    # draw_figure(fig_indiv_risk_assessment, "IHOP Acc")
+    # draw_figure(fig_indiv_risk_assessment, "Refined Score Acc")
+    # draw_figure(fig_indiv_risk_assessment, "Score Acc")
+    # draw_figure(fig_comp_risk_assessment)
+    # draw_figure(fig_comp_countermeasure_tuning)
+    # draw_figure(fig_comp_parameter_tuning)
+    draw_figure(fig_maximum_index_size)
 
-    print_tabular(tab_risk_assess_conclusions)
-    print_tabular(tab_bonferroni_per_year)
-    print_tabular(tab_bonferroni_uniform_sampling)
-    print_tabular(tab_bonferroni_per_year_acc)
-    print_tabular(tab_bonferroni_uniform_sampling_acc)
+    # print_tabular(tab_risk_assess_conclusions)
+    # print_tabular(tab_bonferroni_per_year)
+    # print_tabular(tab_bonferroni_uniform_sampling)
+    # print_tabular(tab_bonferroni_per_year_acc)
+    # print_tabular(tab_bonferroni_uniform_sampling_acc)
