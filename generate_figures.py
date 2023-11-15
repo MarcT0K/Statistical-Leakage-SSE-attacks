@@ -393,13 +393,11 @@ def fig_comp_countermeasure_tuning():
     fig, ax = plt.subplots()
     dataframe = pd.read_csv("risk_assessment_countermeasure.csv")
 
-    x = 1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"]
-    step_size = x.max() / 500
-    x_pred = np.arange(step_size, x.max(), step_size)
+    n_pred = np.arange(100, 10000, 5)
 
     def generate_y(colname):
         slope, intercept = data_to_quant_reg(dataframe, colname)
-        return posit(slope * np.log(x_pred) + intercept)
+        return posit(slope * np.log(1 / n_pred) + intercept)
 
     y_baseline = generate_y("Baseline accuracy")
     y_padding_50 = generate_y("Accuracy with padding parameter 50")
@@ -407,15 +405,15 @@ def fig_comp_countermeasure_tuning():
     y_padding_200 = generate_y("Accuracy with padding parameter 200")
     y_padding_500 = generate_y("Accuracy with padding parameter 500")
 
-    ax.plot(x_pred, y_baseline, label="Baseline")
-    ax.plot(x_pred, y_padding_50, label="Padding threshold = 50")
-    ax.plot(x_pred, y_padding_100, label="Padding threshold = 100")
-    ax.plot(x_pred, y_padding_200, label="Padding threshold = 200")
-    ax.plot(x_pred, y_padding_500, label="Padding threshold = 500")
+    ax.plot(n_pred, y_baseline, label="Baseline")
+    ax.plot(n_pred, y_padding_50, label="Padding threshold = 50")
+    ax.plot(n_pred, y_padding_100, label="Padding threshold = 100")
+    ax.plot(n_pred, y_padding_200, label="Padding threshold = 200")
+    ax.plot(n_pred, y_padding_500, label="Padding threshold = 500")
     ax.legend()
     ax.set(
-        xlabel=r"$\frac{1}{n_\mathrm{atk}}+\frac{1}{n_\mathrm{ind}}$",
-        ylabel="Accuracy",
+        xlabel=r"Maximum index size $n_\mathrm{max}$",
+        ylabel="Maximum accuracy",
     )
     fig.tight_layout()
     fig.savefig("parameter_countermeasure_comparison.png", dpi=400)
@@ -431,27 +429,22 @@ def fig_comp_parameter_tuning():
     ).all() and (
         dataframe_classic["Nb similar docs"] == dataframe_truncated["Nb similar docs"]
     ).all()
-    x = (
-        1 / dataframe_classic["Nb server docs"]
-        + 1 / dataframe_classic["Nb similar docs"]
-    )
-    step_size = x.max() / 500
-    x_pred = np.arange(step_size, x.max(), step_size)
 
+    n_pred = np.arange(100, 3000, 5)
     classic_slope, classic_intercept = data_to_quant_reg(
         dataframe_classic, "Refined Score Acc"
     )
-    y_classic = posit(classic_slope * np.log(x_pred) + classic_intercept)
+    y_classic = posit(classic_slope * np.log(1 / n_pred) + classic_intercept)
     truncated_slope, truncated_intercept = data_to_quant_reg(
         dataframe_truncated, "Refined Score Acc"
     )
-    y_truncated = posit(truncated_slope * np.log(x_pred) + truncated_intercept)
-    ax.plot(x_pred, y_classic, label="Baseline")
-    ax.plot(x_pred, y_truncated, label="Truncated vocabulary")
+    y_truncated = posit(truncated_slope * np.log(1 / n_pred) + truncated_intercept)
+    ax.plot(n_pred, y_classic, label="Baseline")
+    ax.plot(n_pred, y_truncated, label="Truncated vocabulary")
     ax.legend()
     ax.set(
-        xlabel=r"$\frac{1}{n_\mathrm{atk}}+\frac{1}{n_\mathrm{ind}}$",
-        ylabel="Accuracy",
+        xlabel=r"Maximum index size $n_\mathrm{max}$",
+        ylabel="Maximum accuracy",
     )
     fig.tight_layout()
     fig.savefig("parameter_tuning_comparison.png", dpi=400)
@@ -461,38 +454,32 @@ def fig_maximum_index_size():
     fig, ax = plt.subplots()
     dataframe = pd.read_csv("risk_assessment.csv")
 
-    x = 1 / dataframe["Nb server docs"] + 1 / dataframe["Nb similar docs"]
-    y = dataframe["IHOP Acc"]
-    step_size = x.max() / 500
-    x_pred = np.arange((1 / dataframe["Nb similar docs"]).min(), x.max(), step_size)
+    n_pred = np.arange(100, 10000, 5)
 
     quant095_slope, quant095_intercept = data_to_quant_reg(dataframe, "IHOP Acc")
-    y_quant095_inf_atk = posit(quant095_slope * np.log(x_pred) + quant095_intercept)
+    y_quant095_inf_atk = posit(quant095_slope * np.log(1 / n_pred) + quant095_intercept)
     y_quant095_200_atk = posit(
-        quant095_slope * np.log(x_pred + 1 / 200) + quant095_intercept
+        quant095_slope * np.log(1 / n_pred + 1 / 200) + quant095_intercept
     )
     y_quant095_500_atk = posit(
-        quant095_slope * np.log(x_pred + 1 / 500) + quant095_intercept
+        quant095_slope * np.log(1 / n_pred + 1 / 500) + quant095_intercept
     )
     y_quant095_1000_atk = posit(
-        quant095_slope * np.log(x_pred + 1 / 1000) + quant095_intercept
+        quant095_slope * np.log(1 / n_pred + 1 / 1000) + quant095_intercept
     )
 
-    ax.plot(
-        1 / x_pred, y_quant095_inf_atk, label=r"$n_\mathrm{atk} \rightarrow \infty$"
-    )
-    ax.plot(1 / x_pred, y_quant095_1000_atk, label=r"$n_\mathrm{atk} \le 1000$")
-    ax.plot(1 / x_pred, y_quant095_500_atk, label=r"$n_\mathrm{atk} \le 500$")
-    ax.plot(1 / x_pred, y_quant095_200_atk, label=r"$n_\mathrm{atk} \le 200$")
+    ax.plot(n_pred, y_quant095_inf_atk, label=r"$n_\mathrm{atk} \rightarrow \infty$")
+    ax.plot(n_pred, y_quant095_1000_atk, label=r"$n_\mathrm{atk} \le 1000$")
+    ax.plot(n_pred, y_quant095_500_atk, label=r"$n_\mathrm{atk} \le 500$")
+    ax.plot(n_pred, y_quant095_200_atk, label=r"$n_\mathrm{atk} \le 200$")
 
     ax.set(
         xlabel=r"Maximum index size $n_\mathrm{max}$",
         ylabel="Maximum accuracy",
     )
     ax.legend()
-    plt.xlim([0, 7500])
     fig.tight_layout()
-    fig.savefig("max_index_size_IHOP.png", dpi=400, transparent=True)
+    fig.savefig("max_index_size_IHOP.png", dpi=400)
 
 
 def tab_bonferroni_per_year():
@@ -590,8 +577,8 @@ if __name__ == "__main__":
     # draw_figure(fig_indiv_risk_assessment, "Refined Score Acc")
     # draw_figure(fig_indiv_risk_assessment, "Score Acc")
     # draw_figure(fig_comp_risk_assessment)
-    # draw_figure(fig_comp_countermeasure_tuning)
-    # draw_figure(fig_comp_parameter_tuning)
+    draw_figure(fig_comp_countermeasure_tuning)
+    draw_figure(fig_comp_parameter_tuning)
     draw_figure(fig_maximum_index_size)
 
     # print_tabular(tab_risk_assess_conclusions)
