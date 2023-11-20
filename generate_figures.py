@@ -413,7 +413,7 @@ def fig_comp_countermeasure_tuning():
     ax.legend()
     ax.set(
         xlabel=r"Maximum index size $n_\mathrm{max}$",
-        ylabel="Maximum accuracy",
+        ylabel="Maximum attack accuracy",
     )
     fig.tight_layout()
     fig.savefig("parameter_countermeasure_comparison.png", dpi=400)
@@ -444,7 +444,7 @@ def fig_comp_parameter_tuning():
     ax.legend()
     ax.set(
         xlabel=r"Maximum index size $n_\mathrm{max}$",
-        ylabel="Maximum accuracy",
+        ylabel="Maximum attack accuracy",
     )
     fig.tight_layout()
     fig.savefig("parameter_tuning_comparison.png", dpi=400)
@@ -475,7 +475,7 @@ def fig_maximum_index_size():
 
     ax.set(
         xlabel=r"Maximum index size $n_\mathrm{max}$",
-        ylabel="Maximum accuracy",
+        ylabel="Maximum attack accuracy",
     )
     ax.legend()
     fig.tight_layout()
@@ -567,22 +567,21 @@ if __name__ == "__main__":
         raise OSError("No result directory found.")
     os.chdir("results")
 
-    # draw_figure(fig_epsilon_nb_docs)
-    # draw_figure(fig_attack_analysis, "enron")
-    # draw_figure(fig_attack_analysis, "apache")
-    # draw_figure(fig_attack_analysis, "blogs")
-    # draw_figure(fig_attack_analysis_tail_distribution)
-    # draw_figure(fig_comparison_atk)
-    # draw_figure(fig_indiv_risk_assessment, "IHOP Acc")
-    # draw_figure(fig_indiv_risk_assessment, "Refined Score Acc")
-    # draw_figure(fig_indiv_risk_assessment, "Score Acc")
-    # draw_figure(fig_comp_risk_assessment)
+    draw_figure(fig_epsilon_nb_docs)
+    draw_figure(fig_attack_analysis, "enron")
+    draw_figure(fig_attack_analysis, "apache")
+    draw_figure(fig_attack_analysis, "blogs")
+    draw_figure(fig_attack_analysis_tail_distribution)
+    draw_figure(fig_comparison_atk)
+    draw_figure(fig_indiv_risk_assessment, "IHOP Acc")
+    draw_figure(fig_indiv_risk_assessment, "Refined Score Acc")
+    draw_figure(fig_indiv_risk_assessment, "Score Acc")
+    draw_figure(fig_comp_risk_assessment)
     draw_figure(fig_comp_countermeasure_tuning)
     draw_figure(fig_comp_parameter_tuning)
     draw_figure(fig_maximum_index_size)
 
-    # print_tabular(tab_risk_assess_conclusions)
-    # print_tabular(tab_bonferroni_per_year)
-    # print_tabular(tab_bonferroni_uniform_sampling)
-    # print_tabular(tab_bonferroni_per_year_acc)
-    # print_tabular(tab_bonferroni_uniform_sampling_acc)
+    print_tabular(tab_bonferroni_per_year)
+    print_tabular(tab_bonferroni_uniform_sampling)
+    print_tabular(tab_bonferroni_per_year_acc)
+    print_tabular(tab_bonferroni_uniform_sampling_acc)
