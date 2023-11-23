@@ -23,3 +23,6 @@ The folder `src/` contains the following elements:
 - `simulation_utils.py` contains all auxiliary functions necessary to simulate attacks; e.g., adversary knowledge generation.
 - `attacks/` contains the functions to perform the score and IHOP attacks.
 
+## Carbon emission estimation
+
+In line with recent works in ML, we measured the carbon emission related to our experiments using the package [CodeCarbon](https://github.com/mlco2/codecarbon).
