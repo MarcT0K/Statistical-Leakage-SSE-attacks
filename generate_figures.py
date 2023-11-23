@@ -34,6 +34,8 @@ plt.rcParams.update(params)
 
 
 def fig_epsilon_nb_docs():
+    """Generates Figure 1 (Section 3)"""
+
     fig, ax = plt.subplots()
 
     with open("similarity_exploration.csv", "r", encoding="utf-8") as csvfile:
@@ -106,6 +108,8 @@ QUANTILE = 0.95
 
 
 def data_to_xy(dataframe, col_name):
+    """Prepare datasets for regression"""
+
     col = dataframe[col_name]
     mask = np.logical_and(col != 0, col != 1.0)  # To avoid a warning on the logit
     assert sum(~mask) < 1 / 3 * col.shape[0]
@@ -120,6 +124,8 @@ def data_to_xy(dataframe, col_name):
 
 
 def data_to_quant_reg(dataframe, col_name, quantile=QUANTILE):
+    """Compute a quantile regression on a dataset"""
+
     x, y = data_to_xy(dataframe, col_name)
     quant_regression = QuantileRegressor(quantile=quantile, alpha=0).fit(
         x.reshape(-1, 1), y
@@ -130,6 +136,8 @@ def data_to_quant_reg(dataframe, col_name, quantile=QUANTILE):
 
 
 def fig_attack_analysis(dataset_name):
+    """Generates Figures 6 and 7 (Section 5)"""
+
     fig, ax = plt.subplots()
     dataframe = pd.read_csv(f"{dataset_name}_results.csv")
 
@@ -198,6 +206,8 @@ def fig_attack_analysis(dataset_name):
 
 
 def fig_comparison_atk():
+    """Generates Figure 8 (Section 5)"""
+
     def data_to_lin_reg(dataframe, col_name):
         x = np.log(dataframe["Epsilon"])
         y = logit(dataframe[col_name])
@@ -239,6 +249,8 @@ def fig_comparison_atk():
 
 
 def fig_attack_analysis_tail_distribution():
+    """Generates Figure 9 (Appendix C)"""
+
     fig, ax = plt.subplots()
     dataframe = pd.read_csv("enron_extreme_results.csv")
     dataframe = dataframe.sort_values(by="Epsilon")
@@ -304,6 +316,7 @@ def fig_attack_analysis_tail_distribution():
 
 
 def fig_indiv_risk_assessment(col_name):
+    """Generates Figures 2 and 3 (Section 4)"""
     fig, ax = plt.subplots()
     dataframe = pd.read_csv("risk_assessment.csv")
 
@@ -362,6 +375,8 @@ def fig_indiv_risk_assessment(col_name):
 
 
 def fig_comp_risk_assessment():
+    """Generates Figure 2c (Section 4)"""
+
     fig, ax = plt.subplots()
     dataframe = pd.read_csv("risk_assessment.csv")
     # Score+RefinedScore+IHOP risk assessment
@@ -390,6 +405,8 @@ def fig_comp_risk_assessment():
 
 
 def fig_comp_countermeasure_tuning():
+    """Generates Figure 5b (Section 4)"""
+
     fig, ax = plt.subplots()
     dataframe = pd.read_csv("risk_assessment_countermeasure.csv")
 
@@ -420,6 +437,8 @@ def fig_comp_countermeasure_tuning():
 
 
 def fig_comp_parameter_tuning():
+    """Generates Figure 5a (Section 4)"""
+
     fig, ax = plt.subplots()
     dataframe_classic = pd.read_csv("risk_assessment.csv")
     dataframe_truncated = pd.read_csv("risk_assessment_truncated_voc.csv")
@@ -451,6 +470,8 @@ def fig_comp_parameter_tuning():
 
 
 def fig_maximum_index_size():
+    """Generates Figure 4 (Section 4)"""
+
     fig, ax = plt.subplots()
     dataframe = pd.read_csv("risk_assessment.csv")
 
@@ -483,6 +504,8 @@ def fig_maximum_index_size():
 
 
 def tab_bonferroni_per_year():
+    """Generates Table 3a (Appendix B)"""
+
     dataframe = pd.read_csv("bonferroni_tests_by_year.csv")
     print(r"\begin{tabular}{|c|c|c|c|c|}\hline")
     print(
@@ -498,6 +521,8 @@ def tab_bonferroni_per_year():
 
 
 def tab_bonferroni_uniform_sampling():
+    """Generates Table 3b (Appendix B)"""
+
     dataframe = pd.read_csv("bonferroni_tests.csv")
 
     print(r"\begin{tabular}{|c|c|c|c|}\hline")
@@ -511,6 +536,7 @@ def tab_bonferroni_uniform_sampling():
 
 
 def tab_bonferroni_per_year_acc():
+    """Generates Table 2a (Section 3)"""
     dataframe = pd.read_csv("bonferroni_tests_by_year.csv")
     print(r"\begin{tabular}{|c|c|c|c|c|}\hline")
     print(
@@ -531,6 +557,8 @@ def tab_bonferroni_per_year_acc():
 
 
 def tab_bonferroni_uniform_sampling_acc():
+    """Generates Table 2b (Section 3)"""
+
     dataframe = pd.read_csv("bonferroni_tests.csv")
 
     print(r"\begin{tabular}{|c|c|c|c|}\hline")

@@ -41,6 +41,7 @@ def epsilon_sim(coocc_1, coocc_2):
 
 
 def similarity_exploration():
+    """Generates results for Figure 1 (Section 3)"""
     extractor = apache_extractor(VOC_SIZE)
     occ_mat = extractor.occ_array
     n_tot = extractor.occ_array.shape[0]
@@ -98,6 +99,7 @@ def similarity_exploration():
 
 
 def atk_comparison(queryset_size=QUERYSET_SIZE, result_file="atk_comparison.csv"):
+    """Generates the results for Figure 8 (Section 5)"""
     extractor = enron_extractor(VOC_SIZE)
     occ_mat = extractor.occ_array
 
@@ -202,6 +204,7 @@ def atk_comparison(queryset_size=QUERYSET_SIZE, result_file="atk_comparison.csv"
 def generate_ref_score_results(
     extractor_function, dataset_name, truncation_size=-1, voc_size=1000
 ):
+    """Generates results for Figure 6 and 7 (Section 5) and Figure 9 (Appendix C)"""
     extractor = extractor_function(voc_size)
     occ_mat = extractor.occ_array
 
@@ -277,10 +280,13 @@ def generate_ref_score_results(
 
 
 def risk_assessment():
+    """Generates results for Figures 2, 3, and 4 (Section 4)"""
+
     atk_comparison(VOC_SIZE, "risk_assessment.csv")
 
 
 def risk_assessment_truncated_vocabulary():
+    """Generates results for Figure 5a (Section 4)"""
     extractor = enron_extractor(VOC_SIZE)
     occ_mat = extractor.occ_array
 
@@ -354,6 +360,7 @@ def risk_assessment_truncated_vocabulary():
 
 
 def risk_assessment_countermeasure_tuning():
+    """Generates results for Figure 5b (Section 4)"""
     extractor = enron_extractor(VOC_SIZE)
     occ_mat = extractor.occ_array
 
@@ -505,6 +512,7 @@ def compute_p_bc(coocc_1, n_1, coocc_2, n_2):
 
 
 def bonferroni_experiments():
+    """Generates results for Table 2b (Section 3) and Table 3b (Appendix B)"""
     voc_size = 1000
     extractor = apache_extractor(voc_size)
     occ_mat = extractor.occ_array
@@ -571,6 +579,7 @@ def bonferroni_experiments():
 
 
 def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
+    """Generates results for Table 2a (Section 3) and Table 3a (Appendix B)"""
     voc_size = 1000
     with open(result_file, "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = [
@@ -584,7 +593,7 @@ def bonferroni_experiments_by_year(result_file="bonferroni_tests_by_year.csv"):
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        for (i, year_split) in enumerate([2003, 2005, 2007, 2009]):
+        for i, year_split in enumerate([2003, 2005, 2007, 2009]):
             print(f"Experiment {i+1} out of 4")
             ind_docs = extract_apache_ml_by_year(to_year=year_split)
             atk_docs = extract_apache_ml_by_year(from_year=year_split)
