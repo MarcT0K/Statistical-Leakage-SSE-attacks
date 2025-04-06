@@ -1,4 +1,6 @@
-# Experiments of the paper "The statistical nature of leakage in SSE schemes and its role in passive attacks"
+# Experiments of the paper "Revisiting the attacker's knowledge in inference attacks against Searchable Symmetric Encryption"
+
+Link to the paper: https://eprint.iacr.org/2023/1883
 
 Authors: Marc Damie, Jean-Benoist Leger, Florian Hahn, and Andreas Peter.
 
@@ -22,7 +24,3 @@ The folder `src/` contains the following elements:
 - `keyword_extraction.py` contains the functions to process the extracted documents. These functions use multiprocessing to extract keywords efficiently.
 - `simulation_utils.py` contains all auxiliary functions necessary to simulate attacks; e.g., adversary knowledge generation.
 - `attacks/` contains the functions to perform the score and IHOP attacks.
-
-## Carbon emission estimation
-
-In line with recent works in ML, we measured the carbon emission related to our experiments using the package [CodeCarbon](https://github.com/mlco2/codecarbon).
